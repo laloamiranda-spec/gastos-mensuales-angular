@@ -1,0 +1,5 @@
+node_modules
+.angular/cache/
+gastos-app/.angular/
+gastos-app/dist/
+.claude/settings.local.json
