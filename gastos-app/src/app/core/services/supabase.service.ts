@@ -712,6 +712,19 @@ export class SupabaseService {
     return data;
   }
 
+  async uploadTicketPhoto(file: File): Promise<string | null> {
+    const ext = file.name.split('.').pop() || 'jpg';
+    const filename = `ticket_${Date.now()}.${ext}`;
+    const { data, error } = await this.supabase.storage
+      .from('ticket-photos')
+      .upload(filename, file, { upsert: true });
+    if (error) return null;
+    const { data: urlData } = this.supabase.storage
+      .from('ticket-photos')
+      .getPublicUrl(data.path);
+    return urlData.publicUrl;
+  }
+
   async createExpense(expense: any) {
     const { data, error } = await this.supabase
       .from('expenses')

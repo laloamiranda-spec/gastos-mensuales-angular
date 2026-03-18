@@ -1,0 +1,198 @@
+<div class="qc-overlay" (click)="onOverlayClick($event)">
+  <div class="qc-modal" (click)="$event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="qc-header">
+      <div class="qc-steps">
+        <div class="qc-step" [class.active]="step >= 1" [class.done]="step > 1">
+          <div class="qc-step-dot"></div>
+          <span class="qc-step-label">Monto</span>
+        </div>
+        <div class="qc-step-line" [class.done]="step > 1"></div>
+        <div class="qc-step" [class.active]="step >= 2" [class.done]="step > 2">
+          <div class="qc-step-dot"></div>
+          <span class="qc-step-label">Categoría</span>
+        </div>
+        <div class="qc-step-line" [class.done]="step > 2"></div>
+        <div class="qc-step" [class.active]="step >= 3" [class.done]="step > 3">
+          <div class="qc-step-dot"></div>
+          <span class="qc-step-label">Detalle</span>
+        </div>
+        <div class="qc-step-line" [class.done]="step > 3"></div>
+        <div class="qc-step" [class.active]="step >= 4">
+          <div class="qc-step-dot"></div>
+          <span class="qc-step-label">Confirmar</span>
+        </div>
+      </div>
+      <button class="qc-close" (click)="cancel()">✕</button>
+    </div>
+
+    <!-- Step 1: Amount -->
+    <div class="qc-body" *ngIf="step === 1">
+      <div class="qc-step-title">¿Cuánto gastaste?</div>
+      <div class="qc-step-subtitle">Ingresa el monto del ticket o gasto</div>
+      <div class="qc-amount-wrapper">
+        <span class="qc-currency">$</span>
+        <input
+          class="qc-amount-input"
+          type="number"
+          [(ngModel)]="amount"
+          placeholder="0.00"
+          step="0.01"
+          min="0"
+          (keydown.enter)="goToStep(2)"
+          autofocus
+        />
+        <span class="qc-currency-label">MXN</span>
+      </div>
+      <div class="qc-quick-amounts">
+        <button *ngFor="let q of quickAmounts" class="qc-quick-btn" (click)="setAmount(q)">
+          ${{ q | number:'1.0-0' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2: Category -->
+    <div class="qc-body" *ngIf="step === 2">
+      <div class="qc-step-title">¿En qué lo gastaste?</div>
+      <div class="qc-step-subtitle">Selecciona la categoría que mejor describe el gasto</div>
+      <div class="qc-category-grid">
+        <button
+          *ngFor="let cat of categories"
+          class="qc-cat-btn"
+          [class.selected]="selectedCategoryId === cat.id"
+          [style.--cat-color]="cat.color"
+          (click)="selectCategory(cat)"
+        >
+          <span class="qc-cat-icon">{{ cat.icon }}</span>
+          <span class="qc-cat-name">{{ cat.name }}</span>
+        </button>
+        <button
+          class="qc-cat-btn"
+          [class.selected]="selectedCategoryId === ''"
+          [style.--cat-color]="'#6b7280'"
+          (click)="selectCategory(null)"
+        >
+          <span class="qc-cat-icon">📦</span>
+          <span class="qc-cat-name">Otros</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 3: Detail + Photo -->
+    <div class="qc-body" *ngIf="step === 3">
+      <div class="qc-step-title">Agrega el detalle</div>
+      <div class="qc-step-subtitle">Describe el gasto y sube la foto del ticket si tienes</div>
+
+      <div class="form-group" style="margin-bottom:16px;">
+        <label class="form-label">Descripción *</label>
+        <input
+          class="form-control"
+          [(ngModel)]="description"
+          placeholder="Ej. Despensa, gasolina, farmacia..."
+          (keydown.enter)="description && goToStep(4)"
+        />
+      </div>
+
+      <div class="qc-ticket-area" (click)="triggerFileInput()" [class.has-photo]="ticketPreview">
+        <input
+          #fileInput
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style="display:none"
+          (change)="onFileSelected($event)"
+        />
+        <div *ngIf="!ticketPreview" class="qc-ticket-placeholder">
+          <div class="qc-ticket-icon">📷</div>
+          <div class="qc-ticket-text">Toca para tomar foto del ticket</div>
+          <div class="qc-ticket-sub">o selecciona una imagen</div>
+        </div>
+        <div *ngIf="ticketPreview" class="qc-ticket-preview-wrap">
+          <img [src]="ticketPreview" class="qc-ticket-img" alt="Ticket" />
+          <button class="qc-ticket-remove" (click)="removePhoto($event)">✕ Quitar foto</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Confirm -->
+    <div class="qc-body" *ngIf="step === 4">
+      <div class="qc-step-title">Confirma el gasto</div>
+      <div class="qc-step-subtitle">Revisa y ajusta los últimos datos</div>
+
+      <div class="qc-summary-card">
+        <div class="qc-summary-amount mono">${{ amount | number:'1.2-2' }}</div>
+        <div class="qc-summary-desc">{{ description }}</div>
+        <div class="qc-summary-cat" *ngIf="selectedCategory">
+          <span>{{ selectedCategory.icon }}</span>
+          <span>{{ selectedCategory.name }}</span>
+        </div>
+        <div class="qc-summary-ticket" *ngIf="ticketPreview">
+          <img [src]="ticketPreview" class="qc-summary-thumb" alt="Ticket" />
+          <span>Ticket adjunto</span>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-top:16px;">
+        <div class="form-group">
+          <label class="form-label">Miembro</label>
+          <select class="form-control" [(ngModel)]="selectedMemberId">
+            <option value="">Sin asignar</option>
+            <option *ngFor="let m of members" [value]="m.id">{{ m.name }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Forma de pago</label>
+          <select class="form-control" [(ngModel)]="selectedPaymentMethodId">
+            <option value="">Sin especificar</option>
+            <option *ngFor="let pm of paymentMethods" [value]="pm.id">{{ getPaymentMethodIcon(pm.type) }} {{ pm.name }}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:4px;">
+        <label class="form-label">Fecha del gasto</label>
+        <input class="form-control mono" type="date" [(ngModel)]="expenseDate" />
+      </div>
+
+      <div class="qc-paid-toggle">
+        <span class="qc-paid-label">¿Ya está pagado?</span>
+        <div class="qc-toggle-btns">
+          <button class="btn btn-sm" [class.btn-primary]="!isPaid" [class.btn-secondary]="isPaid" (click)="isPaid = false">Pendiente</button>
+          <button class="btn btn-sm" [class.btn-primary]="isPaid" [class.btn-secondary]="!isPaid" (click)="isPaid = true">Pagado</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="qc-footer">
+      <button class="btn btn-secondary" (click)="back()" *ngIf="step > 1 && !saving">
+        ← Atrás
+      </button>
+      <button class="btn btn-secondary" (click)="cancel()" *ngIf="step === 1">
+        Cancelar
+      </button>
+
+      <div class="qc-footer-right">
+        <button
+          *ngIf="step < 4"
+          class="btn btn-primary qc-next-btn"
+          (click)="next()"
+          [disabled]="!canProceed()"
+        >
+          Siguiente →
+        </button>
+        <button
+          *ngIf="step === 4"
+          class="btn btn-primary qc-next-btn"
+          (click)="save()"
+          [disabled]="saving || !description || !amount"
+        >
+          <span *ngIf="!saving">✓ Guardar gasto</span>
+          <span *ngIf="saving">Guardando...</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>

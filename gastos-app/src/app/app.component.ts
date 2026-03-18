@@ -5,12 +5,13 @@ import { NavigationEnd, Router, RouterOutlet, RouterLink, RouterLinkActive } fro
 import { Household } from './core/models/models';
 import { AuthService } from './core/services/auth.service';
 import { SupabaseService } from './core/services/supabase.service';
+import { QuickCaptureComponent } from './features/quick-capture/quick-capture.component';
 import { filter } from 'rxjs';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, QuickCaptureComponent],
   template: `
     <router-outlet *ngIf="isPublicRoute" />
 
@@ -132,6 +133,18 @@ import { filter } from 'rxjs';
         </div>
         <router-outlet />
       </main>
+
+      <!-- FAB: Captura rápida de gasto -->
+      <button class="fab-quick-capture" (click)="showQuickCapture = true" title="Registrar gasto rápido">
+        <span class="fab-icon">+</span>
+        <span class="fab-label">Gasto</span>
+      </button>
+
+      <app-quick-capture
+        *ngIf="showQuickCapture"
+        (saved)="onQuickCaptureSaved()"
+        (cancelled)="showQuickCapture = false"
+      />
     </div>
   `,
   styles: [`
@@ -480,6 +493,70 @@ import { filter } from 'rxjs';
       z-index: 95;
     }
 
+    /* FAB */
+    .fab-quick-capture {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      z-index: 150;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 20px 14px 16px;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: 100px;
+      box-shadow: 0 8px 24px rgba(11,143,106,0.38), 0 2px 8px rgba(5,46,34,0.18);
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.01em;
+      transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .fab-quick-capture:hover {
+      background: var(--color-primary-dim);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(11,143,106,0.44);
+    }
+
+    .fab-quick-capture:active {
+      transform: translateY(0);
+    }
+
+    .fab-icon {
+      font-size: 22px;
+      font-weight: 300;
+      line-height: 1;
+    }
+
+    .fab-label {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 900px) {
+      .fab-quick-capture {
+        bottom: 20px;
+        right: 16px;
+        padding: 16px;
+        border-radius: 50%;
+        width: 58px;
+        height: 58px;
+        justify-content: center;
+      }
+
+      .fab-label {
+        display: none;
+      }
+
+      .fab-icon {
+        font-size: 28px;
+      }
+    }
+
     @media (max-width: 900px) {
       .desktop-topbar {
         display: none;
@@ -527,6 +604,7 @@ export class AppComponent implements OnInit {
   households: Household[] = [];
   selectedHouseholdId = '';
   isPublicRoute = false;
+  showQuickCapture = false;
 
   get currentHousehold() {
     return this.households.find(household => household.id === this.selectedHouseholdId) || null;
@@ -597,6 +675,10 @@ export class AppComponent implements OnInit {
 
   closeMobileNav() {
     this.mobileNavOpen = false;
+  }
+
+  onQuickCaptureSaved() {
+    this.showQuickCapture = false;
   }
 
   private syncRouteMode(url: string) {
