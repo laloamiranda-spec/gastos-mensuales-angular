@@ -36,6 +36,11 @@ jobs:
         working-directory: gastos-app
         run: npm run build -- --base-href /gastos-mensuales-angular/
 
+      - name: SPA fallback (404.html)
+        # GitHub Pages no reescribe rutas: sin esto, recargar /inicio u otra ruta da 404.
+        # Copiamos index.html como 404.html para que Angular resuelva la ruta en el cliente.
+        run: cp gastos-app/dist/gastos-mensuales/browser/index.html gastos-app/dist/gastos-mensuales/browser/404.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
