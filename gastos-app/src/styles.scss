@@ -295,6 +295,13 @@ select.form-control option {
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   -webkit-overflow-scrolling: touch;
+  /* Sombra sutil en el borde derecho para indicar que hay más contenido al deslizar */
+  background:
+    linear-gradient(to right, var(--color-surface) 30%, rgba(255,253,248,0)) left center / 24px 100% no-repeat,
+    linear-gradient(to left, var(--color-surface) 30%, rgba(255,253,248,0)) right center / 24px 100% no-repeat,
+    radial-gradient(farthest-side at 0 50%, rgba(19,33,28,0.10), transparent) left center / 12px 100% no-repeat,
+    radial-gradient(farthest-side at 100% 50%, rgba(19,33,28,0.10), transparent) right center / 12px 100% no-repeat;
+  background-attachment: local, local, scroll, scroll;
 }
 
 table { width: 100%; border-collapse: collapse; min-width: 720px; }
@@ -634,6 +641,56 @@ tbody td {
 }
 
 /* ================================================
+   LISTAS EN TARJETA PARA MÓVIL (reemplazan tablas)
+   Uso: .m-cards.only-mobile junto a .table-wrapper.only-desktop
+   ================================================ */
+.only-mobile { display: none; }
+
+@media (max-width: 900px) {
+  .only-mobile  { display: block; }
+  .only-desktop { display: none !important; }
+
+  .m-cards { display: flex; flex-direction: column; gap: 10px; }
+
+  .m-card {
+    padding: 14px;
+    border-radius: 16px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-card);
+  }
+
+  .m-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .m-card-title { font-weight: 700; color: var(--color-accent); font-size: 14px; line-height: 1.3; }
+  .m-card-sub   { color: var(--color-text-muted); font-size: 12px; margin-top: 3px; line-height: 1.4; }
+
+  .m-card-amount {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 15px;
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .m-card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+  .m-card-rows { display: grid; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--color-text); }
+  .m-card-row  { display: flex; justify-content: space-between; gap: 12px; }
+  .m-card-row > span:first-child { color: var(--color-text-muted); }
+  .m-card-row > span:last-child  { font-weight: 600; text-align: right; } /* color lo pone la clase .text-* si aplica */
+
+  .m-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .m-card-actions .btn { flex: 1 1 auto; min-width: 96px; width: auto; }
+}
+
+/* ================================================
    RESPONSIVE
    ================================================ */
 @media (max-width: 1024px) {
@@ -647,7 +704,9 @@ tbody td {
   .main-content       { margin-left: 0; }
   .page               { padding: 18px 16px 28px; }
   .page-title         { font-size: 32px; }
-  .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  /* Métricas en 2×2 en vez de 1 columna: menos scroll para ver el resumen */
+  .grid-4             { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .grid-3, .grid-2    { grid-template-columns: 1fr; }
   .form-row           { grid-template-columns: 1fr; }
   .form-row.col3      { grid-template-columns: 1fr; }
   .month-selector     { width: 100%; justify-content: space-between; }
@@ -661,18 +720,58 @@ tbody td {
   .modal-footer .btn  { width: 100%; }
   .card               { padding: 16px; }
   .card-title         { width: 100%; }
-  tbody td            { padding: 10px 12px; }
+
+  /* ── Touch targets cómodos (mín. 44px) ───────── */
+  .btn                { min-height: 44px; }
+  .btn-sm             { min-height: 38px; padding: 8px 12px; }
+  .btn-icon           { min-width: 44px; min-height: 44px; }
+  .btn-sm.btn-icon    { min-width: 38px; min-height: 38px; }
+  .tab                { min-height: 40px; }
+  .form-control       { min-height: 44px; font-size: 16px; } /* 16px evita el zoom automático de iOS */
+  select.form-control { min-height: 44px; }
+  .month-selector button { min-width: 40px; min-height: 40px; font-size: 20px; }
+
+  /* ── Headers de tarjeta: apilar y usar todo el ancho ── */
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .card-header > * { width: 100%; }
+  /* Neutraliza anchos fijos puestos en línea (ej. width:160px, max-width:340px) */
+  .card-header .tabs,
+  .card-header select,
+  .card-header .form-control,
+  .filter-bar .tabs {
+    width: 100% !important;
+    max-width: none !important;
+  }
+  .filter-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* ── Tablas: caben mejor y el scroll lateral es cómodo ── */
+  .table-wrapper      { -webkit-overflow-scrolling: touch; }
+  table               { min-width: 560px; }
+  tbody td            { padding: 12px; font-size: 13px; }
   thead th            { padding: 10px 12px; }
 }
 
 @media (max-width: 560px) {
-  .page-title    { font-size: 28px; }
+  .page-title    { font-size: 26px; }
   .page-subtitle { font-size: 13px; }
-  .stat-value    { font-size: 24px; }
+  .stat-value    { font-size: 22px; }
   .empty-state   { padding: 36px 18px; }
   .tabs          { padding: 3px; margin-bottom: 16px; }
-  .tab           { padding: 8px 12px; font-size: 12px; }
+  .tab           { padding: 10px 12px; font-size: 12px; }
   .btn           { width: 100%; }
+  /* Excepciones: botones dentro de grupos de acción, celdas o íconos NO se estiran */
+  .flex .btn,
+  td .btn,
+  .tabs .tab,
+  .btn-icon,
+  .month-selector .btn { width: auto; }
   .page-header > div:last-child {
     width: 100%;
   }
@@ -681,4 +780,7 @@ tbody td {
   .page-header .month-selector {
     width: 100% !important;
   }
+  /* Grupos de acciones (Editar/Eliminar/Pagar): que quepan y no se encimen */
+  .flex.gap-1,
+  .flex.gap-2 { flex-wrap: wrap; }
 }

@@ -158,7 +158,36 @@ type ReportView = 'payments' | 'annual' | 'categories';
             <span class="card-title">Proyeccion mensual {{ selectedYear }}{{ selectedMemberId ? ' - ' + selectedMemberName : '' }}</span>
             <span class="badge badge-muted mono">12 meses</span>
           </div>
-          <div class="table-wrapper">
+          <div class="m-cards only-mobile">
+            <div class="m-card" *ngFor="let row of monthRows" [class.current-month]="isCurrentMonth(row)">
+              <div class="m-card-top">
+                <div class="m-card-title">{{ row.label }}</div>
+                <span class="badge"
+                      [class.badge-success]="row.balance >= 0 && row.savingsRate >= 20"
+                      [class.badge-warning]="row.balance >= 0 && row.savingsRate < 20 && row.savingsRate >= 0"
+                      [class.badge-danger]="row.balance < 0">
+                  {{ row.balance < 0 ? 'Deficit' : row.savingsRate >= 20 ? 'Optimo' : 'Ajustado' }}
+                </span>
+              </div>
+              <div class="m-card-rows mono">
+                <div class="m-card-row"><span>Ingresos</span><span class="text-primary">{{ row.income | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>Gastos</span><span class="text-danger">{{ row.expenses | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>Balance</span><span [class.text-primary]="row.balance >= 0" [class.text-danger]="row.balance < 0">{{ row.balance | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>Ahorro</span><span [class.text-primary]="row.savingsRate >= 20" [class.text-warning]="row.savingsRate > 0 && row.savingsRate < 20" [class.text-danger]="row.savingsRate <= 0">{{ row.savingsRate | number:'1.1-1' }}%</span></div>
+                <div class="m-card-row"><span>Mayor gasto</span><span>{{ row.topCategory || '—' }}</span></div>
+              </div>
+            </div>
+            <div class="m-card" style="background:var(--color-surface-2);">
+              <div class="m-card-title">Total {{ selectedYear }}</div>
+              <div class="m-card-rows mono">
+                <div class="m-card-row"><span>Ingresos</span><span class="text-primary">{{ annualIncome | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>Gastos</span><span class="text-danger">{{ annualExpenses | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>Balance</span><span [class.text-primary]="annualBalance >= 0" [class.text-danger]="annualBalance < 0">{{ annualBalance | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>Ahorro</span><span>{{ annualSavingsRate | number:'1.1-1' }}%</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrapper only-desktop">
             <table>
               <thead>
                 <tr>
@@ -252,7 +281,24 @@ type ReportView = 'payments' | 'annual' | 'categories';
             <div class="empty-state-title">Sin pagos para ese filtro</div>
             <div class="empty-state-sub">Prueba con otro mes o selecciona otra tarjeta para revisar lo que toca liquidar.</div>
           </div>
-          <div class="table-wrapper" *ngIf="filteredPaymentSummaryRows.length > 0">
+          <div class="m-cards only-mobile" *ngIf="filteredPaymentSummaryRows.length > 0">
+            <div class="m-card" *ngFor="let row of filteredPaymentSummaryRows">
+              <div class="m-card-top">
+                <div>
+                  <div class="m-card-title">{{ getPaymentMethodIcon(row.methodType) }} {{ row.methodName }}</div>
+                  <div class="m-card-sub">{{ formatDueDateLabel(row) }} · {{ getPaymentMethodTypeLabel(row.methodType) }}<span *ngIf="row.methodLastFour" class="mono"> ···· {{ row.methodLastFour }}</span></div>
+                  <div class="m-card-sub">{{ describePaymentRow(row) }}</div>
+                </div>
+                <div class="m-card-amount" [class.text-danger]="row.creditTotal > 0" [class.text-warning]="row.creditTotal === 0 && row.pendingTotal > 0">{{ row.total | currency:'MXN':'symbol':'1.0-0' }}</div>
+              </div>
+              <div class="m-card-rows mono">
+                <div class="m-card-row"><span>Pendiente</span><span class="text-warning">{{ row.pendingTotal | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>Tarjeta</span><span class="text-danger">{{ row.creditTotal | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>Gastos</span><span>{{ row.count }}</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrapper only-desktop" *ngIf="filteredPaymentSummaryRows.length > 0">
             <table>
               <thead>
                 <tr>
@@ -301,7 +347,22 @@ type ReportView = 'payments' | 'annual' | 'categories';
             <div class="empty-state-icon">📂</div>
             <div class="empty-state-title">Sin datos de categorias</div>
           </div>
-          <div class="table-wrapper" *ngIf="annualCategoryTotals.length > 0">
+          <div class="m-cards only-mobile" *ngIf="annualCategoryTotals.length > 0">
+            <div class="m-card" *ngFor="let cat of annualCategoryTotals">
+              <div class="m-card-top">
+                <div class="m-card-title">{{ cat.icon }} {{ cat.name }}</div>
+                <div class="m-card-amount">{{ cat.total | currency:'MXN':'symbol':'1.0-0' }}</div>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" [style.background]="cat.color" [style.width.%]="cat.pct"></div>
+              </div>
+              <div class="m-card-rows mono">
+                <div class="m-card-row"><span>Promedio mes</span><span class="text-muted">{{ cat.monthly | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>% del gasto</span><span>{{ cat.pct | number:'1.1-1' }}%</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrapper only-desktop" *ngIf="annualCategoryTotals.length > 0">
             <table>
               <thead>
                 <tr>

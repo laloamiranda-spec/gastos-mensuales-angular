@@ -112,27 +112,41 @@ import { filter } from 'rxjs';
         </div>
 
         <div class="mobile-topbar">
-          <div class="mobile-topbar-row">
-            <button class="mobile-menu-btn" type="button" (click)="toggleMobileNav()" aria-label="Abrir menu">
-              {{ mobileNavOpen ? 'X' : '|||'}}
-            </button>
-            <div class="mobile-topbar-brand">
-              <div class="mobile-brand-icon">MX</div>
-              <div class="mobile-brand-copy">
-                <span>FinanzasCasa</span>
-                <small>{{ currentHousehold?.name || 'Sin hogar' }}</small>
-              </div>
-            </div>
-          </div>
-          <div class="mobile-household" *ngIf="households.length > 0">
-            <div class="mobile-household-label">Hogar</div>
-            <select class="mobile-household-select" [(ngModel)]="selectedHouseholdId" (ngModelChange)="onHouseholdChange($event)">
-              <option *ngFor="let household of households" [value]="household.id">{{ household.name }}</option>
-            </select>
-          </div>
+          <select *ngIf="households.length > 0" class="mobile-household-select" [(ngModel)]="selectedHouseholdId" (ngModelChange)="onHouseholdChange($event)">
+            <option *ngFor="let household of households" [value]="household.id">{{ household.name }}</option>
+          </select>
+          <span *ngIf="households.length === 0" class="mobile-brand-name">FinanzasCasa</span>
+          <button class="mobile-capture-btn" type="button" (click)="showQuickCapture = true" aria-label="Registrar gasto">
+            <span class="mobile-capture-plus">+</span>
+            <span>Registrar gasto</span>
+          </button>
         </div>
         <router-outlet />
       </main>
+
+      <!-- Barra de navegación inferior (solo móvil) -->
+      <nav class="bottom-nav">
+        <a routerLink="/inicio" routerLinkActive="active" class="bottom-nav-item">
+          <span class="bottom-nav-icon">🏠</span>
+          <span class="bottom-nav-label">Inicio</span>
+        </a>
+        <a routerLink="/pagos-y-gastos" routerLinkActive="active" class="bottom-nav-item">
+          <span class="bottom-nav-icon">💳</span>
+          <span class="bottom-nav-label">Gastos</span>
+        </a>
+        <a routerLink="/tu-dinero" routerLinkActive="active" class="bottom-nav-item">
+          <span class="bottom-nav-icon">💰</span>
+          <span class="bottom-nav-label">Dinero</span>
+        </a>
+        <a routerLink="/plan-mensual" routerLinkActive="active" class="bottom-nav-item">
+          <span class="bottom-nav-icon">📅</span>
+          <span class="bottom-nav-label">Plan</span>
+        </a>
+        <button type="button" class="bottom-nav-item" [class.active]="mobileNavOpen" (click)="toggleMobileNav()">
+          <span class="bottom-nav-icon">☰</span>
+          <span class="bottom-nav-label">Más</span>
+        </button>
+      </nav>
 
       <!-- FAB: Captura rápida de gasto -->
       <button class="fab-quick-capture" (click)="showQuickCapture = true" title="Registrar gasto rápido">
@@ -411,77 +425,74 @@ import { filter } from 'rxjs';
       top: 0;
       z-index: 90;
       flex-direction: column;
-      gap: 10px;
-      padding: 12px 16px;
+      align-items: stretch;
+      gap: 8px;
+      padding: 8px 12px 10px;
       background: rgba(244,251,247,0.92);
       backdrop-filter: blur(10px);
       border-bottom: 1px solid var(--color-border);
     }
 
-    .mobile-topbar-row {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .mobile-menu-btn {
-      width: 42px;
-      height: 42px;
-      border: 1px solid var(--color-border);
-      border-radius: 12px;
-      background: var(--color-surface);
-      color: var(--color-accent);
-      font-size: 18px;
-      cursor: pointer;
-      box-shadow: var(--shadow-card);
-    }
-
-    .mobile-topbar-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .mobile-brand-name {
       font-family: var(--font-display);
       font-weight: 700;
       color: var(--color-accent);
-    }
-
-    .mobile-brand-copy {
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-    }
-
-    .mobile-brand-copy small {
-      font-family: var(--font-body);
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--color-text-muted);
-    }
-
-    .mobile-household {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .mobile-household-label {
-      font-size: 12px;
-      color: var(--color-text-muted);
-      min-width: 42px;
+      font-size: 15px;
     }
 
     .mobile-household-select {
-      flex: 1;
+      width: 100%;
       min-width: 0;
       border: 1px solid var(--color-border);
-      border-radius: 12px;
+      border-radius: 10px;
       background: var(--color-surface);
-      padding: 10px 12px;
+      padding: 9px 12px;
       color: var(--color-accent);
-      font-size: 13px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .mobile-capture-btn {
+      align-self: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 240px;
+      min-height: 50px;
+      padding: 12px 30px;
+      background: linear-gradient(135deg, #14c088 0%, var(--color-primary) 55%, var(--color-primary-dim) 100%);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      box-shadow: 0 8px 22px rgba(11,143,106,0.42);
+      animation: capturePulse 2.4s ease-in-out infinite;
+      transition: transform 0.15s ease;
+    }
+
+    .mobile-capture-btn:active {
+      transform: scale(0.97);
+    }
+
+    .mobile-capture-plus {
+      font-size: 24px;
+      font-weight: 400;
+      line-height: 1;
+      margin-top: -2px;
+    }
+
+    @keyframes capturePulse {
+      0%, 100% { box-shadow: 0 8px 22px rgba(11,143,106,0.42), 0 0 0 0 rgba(11,143,106,0.32); }
+      50%      { box-shadow: 0 8px 26px rgba(11,143,106,0.52), 0 0 0 10px rgba(11,143,106,0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .mobile-capture-btn { animation: none; }
     }
 
     .mobile-backdrop.open {
@@ -537,24 +548,63 @@ import { filter } from 'rxjs';
       font-weight: 700;
     }
 
-    @media (max-width: 900px) {
-      .fab-quick-capture {
-        bottom: 20px;
-        right: 16px;
-        padding: 16px;
-        border-radius: 50%;
-        width: 58px;
-        height: 58px;
-        justify-content: center;
-      }
+    /* Barra de navegación inferior — oculta en escritorio */
+    .bottom-nav { display: none; }
 
-      .fab-label {
+    @media (max-width: 900px) {
+      /* En móvil el registro rápido vive en la barra superior (botón "+ Gasto"),
+         así que ocultamos el FAB flotante que tapaba el contenido. */
+      .fab-quick-capture {
         display: none;
       }
 
-      .fab-icon {
-        font-size: 28px;
+      .bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 90;
+        justify-content: space-around;
+        gap: 2px;
+        padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+        background: rgba(255,253,248,0.94);
+        backdrop-filter: blur(12px);
+        border-top: 1px solid var(--color-border);
+        box-shadow: 0 -6px 20px rgba(19,33,28,0.06);
       }
+
+      .bottom-nav-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        min-height: 52px;
+        padding: 6px 2px;
+        background: none;
+        border: none;
+        border-radius: 12px;
+        color: var(--color-text-muted);
+        font-family: var(--font-body);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        text-decoration: none;
+        cursor: pointer;
+        transition: var(--transition);
+      }
+
+      .bottom-nav-item.active {
+        color: var(--color-primary);
+        background: var(--color-primary-glow);
+      }
+
+      .bottom-nav-icon { font-size: 20px; line-height: 1; }
+
+      /* El contenido no queda tapado por la barra */
+      .main-content { padding-bottom: 78px; }
     }
 
     @media (max-width: 900px) {
