@@ -174,7 +174,7 @@
   align-items: center;
   gap: 8px;
   justify-content: center;
-  margin-bottom: 24px;
+  margin-bottom: 6px;
 }
 
 .qc-currency {
@@ -211,32 +211,6 @@
   &[type=number] { -moz-appearance: textfield; }
 }
 
-.qc-quick-amounts {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.qc-quick-btn {
-  padding: 7px 14px;
-  border-radius: 100px;
-  border: 1.5px solid var(--color-border, #d8dfcc);
-  background: var(--color-surface, #fffdf8);
-  color: var(--color-text-muted, #6a7d71);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  font-family: var(--font-mono, 'DM Mono', monospace);
-
-  &:hover {
-    border-color: var(--color-primary, #0b8f6a);
-    color: var(--color-primary, #0b8f6a);
-    background: rgba(11,143,106,0.06);
-  }
-}
-
 /* Step 2 – Categories */
 .qc-category-grid {
   display: grid;
@@ -248,9 +222,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px 8px 14px;
-  border-radius: 18px;
+  gap: 5px;
+  padding: 10px 6px 9px;
+  border-radius: 14px;
   border: 2px solid var(--color-border, #d8dfcc);
   background: var(--color-surface, #fffdf8);
   cursor: pointer;
@@ -268,16 +242,16 @@
 }
 
 .qc-cat-icon {
-  font-size: 26px;
+  font-size: 18px;
   line-height: 1;
 }
 
 .qc-cat-name {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--color-text, #215246);
   text-align: center;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
 /* Step 3 – Ticket photo */
