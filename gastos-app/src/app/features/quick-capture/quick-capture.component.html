@@ -50,14 +50,8 @@
       />
       <span class="qc-currency-label">MXN</span>
     </div>
-    <div class="qc-quick-amounts">
-      <button *ngFor="let q of quickAmounts" class="qc-quick-btn" (click)="setAmount(q)">
-        ${{ q | number:'1.0-0' }}
-      </button>
-    </div>
-
     <!-- Categoría -->
-    <label class="form-label" style="display:block;margin:22px 0 10px;">Categoría</label>
+    <label class="form-label" style="display:block;margin:20px 0 10px;">¿En qué gastaste?</label>
     <div class="qc-category-grid">
       <button
         *ngFor="let cat of categories"

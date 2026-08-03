@@ -27,7 +27,6 @@ export class QuickCaptureComponent implements OnInit {
 
   // Step 1
   amount: number | null = null;
-  quickAmounts = [50, 100, 200, 500, 1000, 2000];
 
   // Step 2
   categories: Category[] = [];
@@ -65,10 +64,6 @@ export class QuickCaptureComponent implements OnInit {
   /** Enfoca el campo de monto para empezar a teclear de inmediato. */
   private focusAmount() {
     setTimeout(() => this.amountInput?.nativeElement.focus(), 120);
-  }
-
-  setAmount(val: number) {
-    this.amount = val;
   }
 
   selectCategory(cat: Category | null) {
