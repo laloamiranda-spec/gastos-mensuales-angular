@@ -1,10 +1,10 @@
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Category, Member, PaymentMethod, PAYMENT_METHOD_TYPES, PaymentMethodType } from '../../core/models/models';
 import { SupabaseService } from '../../core/services/supabase.service';
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2;
 
 @Component({
   selector: 'app-quick-capture',
@@ -14,14 +14,19 @@ type Step = 1 | 2 | 3 | 4;
   styleUrl: './quick-capture.component.scss',
 })
 export class QuickCaptureComponent implements OnInit {
+  /** 'modal' = overlay dentro de la app · 'page' = ruta a pantalla completa */
+  @Input() mode: 'modal' | 'page' = 'modal';
   @Output() saved = new EventEmitter<void>();
   @Output() cancelled = new EventEmitter<void>();
+
+  @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('amountInput') amountInput?: ElementRef<HTMLInputElement>;
 
   step: Step = 1;
   saving = false;
 
   // Step 1
-  amount = 0;
+  amount: number | null = null;
   quickAmounts = [50, 100, 200, 500, 1000, 2000];
 
   // Step 2
@@ -54,6 +59,12 @@ export class QuickCaptureComponent implements OnInit {
     this.categories = cats || [];
     this.members = mems || [];
     this.paymentMethods = pms || [];
+    this.focusAmount();
+  }
+
+  /** Enfoca el campo de monto para empezar a teclear de inmediato. */
+  private focusAmount() {
+    setTimeout(() => this.amountInput?.nativeElement.focus(), 120);
   }
 
   setAmount(val: number) {
@@ -66,12 +77,10 @@ export class QuickCaptureComponent implements OnInit {
     if (!this.description && cat) {
       this.description = cat.name;
     }
-    setTimeout(() => this.goToStep(3), 180);
   }
 
   triggerFileInput() {
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    input?.click();
+    this.fileInput?.nativeElement.click();
   }
 
   onFileSelected(event: Event) {
@@ -92,8 +101,7 @@ export class QuickCaptureComponent implements OnInit {
   }
 
   canProceed(): boolean {
-    if (this.step === 1) return this.amount > 0;
-    if (this.step === 3) return !!this.description;
+    if (this.step === 1) return (this.amount ?? 0) > 0 && !!this.description;
     return true;
   }
 
@@ -103,7 +111,10 @@ export class QuickCaptureComponent implements OnInit {
   }
 
   back() {
-    if (this.step > 1) this.goToStep((this.step - 1) as Step);
+    if (this.step > 1) {
+      this.goToStep((this.step - 1) as Step);
+      if (this.step === 1) this.focusAmount();
+    }
   }
 
   goToStep(s: Step) {
@@ -111,7 +122,8 @@ export class QuickCaptureComponent implements OnInit {
   }
 
   async save() {
-    if (!this.description || !this.amount) return;
+    const amountValue = this.amount ?? 0;
+    if (!this.description || amountValue <= 0) return;
     this.saving = true;
     try {
       let notes: string | null = null;
@@ -122,7 +134,7 @@ export class QuickCaptureComponent implements OnInit {
       const now = new Date();
       await this.supabase.createExpense({
         description: this.description,
-        amount: this.amount,
+        amount: amountValue,
         category_id: this.selectedCategoryId || null,
         member_id: this.selectedMemberId || null,
         payment_method_id: this.selectedPaymentMethodId || null,

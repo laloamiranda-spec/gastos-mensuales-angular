@@ -21,6 +21,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent),
   },
   {
+    path: 'capturar',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/capture/capture.component').then(m => m.CaptureComponent),
+  },
+  {
     path: 'pagos-y-gastos',
     canActivate: [authGuard],
     loadComponent: () => import('./features/expenses/expenses.component').then(m => m.ExpensesComponent),

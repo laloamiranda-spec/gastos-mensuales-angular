@@ -13,9 +13,9 @@ import { filter } from 'rxjs';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, QuickCaptureComponent],
   template: `
-    <router-outlet *ngIf="isPublicRoute" />
+    <router-outlet *ngIf="isBareRoute" />
 
-    <div class="app-layout" *ngIf="!isPublicRoute">
+    <div class="app-layout" *ngIf="!isBareRoute">
       <div class="mobile-backdrop" [class.open]="mobileNavOpen" (click)="closeMobileNav()"></div>
 
       <aside class="sidebar" [class.open]="mobileNavOpen">
@@ -116,7 +116,7 @@ import { filter } from 'rxjs';
             <option *ngFor="let household of households" [value]="household.id">{{ household.name }}</option>
           </select>
           <span *ngIf="households.length === 0" class="mobile-brand-name">FinanzasCasa</span>
-          <button class="mobile-capture-btn" type="button" (click)="showQuickCapture = true" aria-label="Registrar gasto">
+          <button class="mobile-capture-btn" type="button" routerLink="/capturar" aria-label="Registrar gasto">
             <span class="mobile-capture-plus">+</span>
             <span>Registrar gasto</span>
           </button>
@@ -654,6 +654,7 @@ export class AppComponent implements OnInit {
   households: Household[] = [];
   selectedHouseholdId = '';
   isPublicRoute = false;
+  isBareRoute = false;
   showQuickCapture = false;
 
   get currentHousehold() {
@@ -733,6 +734,8 @@ export class AppComponent implements OnInit {
 
   private syncRouteMode(url: string) {
     this.isPublicRoute = url === '/' || url.startsWith('/crear-cuenta') || url.startsWith('/acceso');
+    // La ruta de captura se muestra a pantalla completa, sin sidebar ni barras.
+    this.isBareRoute = this.isPublicRoute || url.startsWith('/capturar');
   }
 
   @HostListener('window:resize')
