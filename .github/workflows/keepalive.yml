@@ -1,0 +1,29 @@
+name: Keep Supabase awake
+
+# Hace un ping ligero al REST de Supabase para que el proyecto (plan gratis)
+# no se pause por inactividad (se pausa tras ~7 dias sin actividad).
+
+on:
+  schedule:
+    - cron: '17 12 */3 * *'   # cada 3 dias, 12:17 UTC
+  workflow_dispatch:            # permite ejecutarlo manualmente
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST
+        env:
+          SUPABASE_URL: https://yqivkvqgqvizpnqqpwbs.supabase.co
+          # Clave publishable/anon: ya es publica (va en el bundle del frontend).
+          SUPABASE_ANON_KEY: sb_publishable_csusMz_p6Bchr4OghudOTw_UNRE8M1M
+        run: |
+          code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "$SUPABASE_URL/rest/v1/households?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "Respuesta HTTP: $code"
+          # 200 (o 401/403 por RLS) significa que el proyecto respondio => sigue activo.
+          if [ "$code" = "000" ]; then
+            echo "Sin respuesta del servidor"; exit 1
+          fi
