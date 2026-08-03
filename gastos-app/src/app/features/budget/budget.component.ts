@@ -72,118 +72,6 @@ interface AISuggestion {
           </div>
         </div>
 
-        <!-- IA Budget Suggestion -->
-        <div class="card mb-6">
-          <div class="card-header">
-            <span class="card-title">✨ Presupuesto sugerido con IA</span>
-            <span class="badge badge-muted" style="font-size:11px;">Claude Opus · Adaptive Thinking</span>
-          </div>
-          <div style="padding:16px 24px 20px;">
-
-            <!-- Income source toggle -->
-            <div class="ai-income-row">
-              <div style="font-size:13px;font-weight:600;color:var(--color-text);margin-bottom:10px;">Base de ingresos para sugerencia</div>
-              <div class="toggle-group mb-3">
-                <button class="toggle-btn" [class.active]="!aiManualIncome" (click)="aiManualIncome=false">
-                  📊 Usar entradas registradas
-                </button>
-                <button class="toggle-btn" [class.active]="aiManualIncome" (click)="aiManualIncome=true">
-                  ✏️ Ingresar manualmente
-                </button>
-              </div>
-              <div *ngIf="aiManualIncome" class="ai-input-row">
-                <label style="font-size:13px;color:var(--color-text-muted);margin-bottom:4px;display:block;">Ingreso mensual total (MXN)</label>
-                <input type="number" class="form-control" [(ngModel)]="aiIncomeInput"
-                       placeholder="Ej. 25000" min="0" step="500" style="max-width:240px;" />
-              </div>
-              <div *ngIf="!aiManualIncome" class="ai-income-preview">
-                <span class="text-muted" style="font-size:13px;">Usando entradas registradas:</span>
-                <span class="mono text-primary" style="font-size:15px;font-weight:700;margin-left:8px;">{{ totalIncome | currency:'MXN':'symbol':'1.0-0' }}</span>
-              </div>
-            </div>
-
-            <button class="btn btn-primary" style="margin-top:14px;gap:8px;"
-                    (click)="generateAI()" [disabled]="aiLoading || aiIncomeForRequest <= 0">
-              <span *ngIf="!aiLoading">✨ Generar presupuesto con IA</span>
-              <span *ngIf="aiLoading" style="display:flex;align-items:center;gap:8px;">
-                <span class="spinner-sm"></span> Analizando con IA...
-              </span>
-            </button>
-            <div *ngIf="aiError" class="ai-error">{{ aiError }}</div>
-
-          </div>
-
-          <!-- AI Results -->
-          <ng-container *ngIf="aiResult as r">
-          <div class="ai-result">
-            <div class="ai-result-header">
-              <div class="ai-health" [class]="'ai-health-' + r.salud_financiera">
-                <span class="ai-health-dot"></span>
-                Salud financiera:
-                <strong>{{ r.salud_financiera === 'buena' ? 'Buena' : r.salud_financiera === 'regular' ? 'Regular' : 'Crítica' }}</strong>
-              </div>
-              <div class="ai-savings">
-                <span class="text-muted" style="font-size:12px;">Ahorro sugerido</span>
-                <span class="mono text-primary" style="font-size:18px;font-weight:700;">{{ r.monto_ahorro | currency:'MXN':'symbol':'1.0-0' }}</span>
-                <span class="badge badge-success">{{ r.tasa_ahorro_sugerida }}%</span>
-              </div>
-            </div>
-
-            <div class="ai-summary">
-              <div style="font-size:13px;line-height:1.6;color:var(--color-text);">{{ r.resumen }}</div>
-            </div>
-
-            <!-- Alerts from AI -->
-            <div *ngIf="r.alertas?.length" class="ai-alerts">
-              <div *ngFor="let alerta of r.alertas" class="alert-item alert-yellow" style="margin-bottom:8px;">
-                <div class="alert-icon">⚠️</div>
-                <div class="alert-body">
-                  <div class="alert-detail">{{ alerta }}</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Category suggestions -->
-            <div class="ai-categories">
-              <div style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">
-                Distribución sugerida por categoría
-              </div>
-              <div class="ai-cat-grid">
-                <div *ngFor="let cat of r.categorias" class="ai-cat-card">
-                  <div class="ai-cat-header">
-                    <span style="font-weight:600;font-size:13px;">{{ cat.nombre }}</span>
-                    <span class="badge badge-muted mono">{{ cat.porcentaje }}%</span>
-                  </div>
-                  <div class="mono text-primary" style="font-size:16px;font-weight:700;">{{ cat.monto | currency:'MXN':'symbol':'1.0-0' }}</div>
-                  <div style="font-size:11px;color:var(--color-text-muted);margin-top:4px;line-height:1.4;">{{ cat.razon }}</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Recommendations -->
-            <div *ngIf="r.recomendaciones?.length" class="ai-recs">
-              <div style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">
-                Recomendaciones
-              </div>
-              <div *ngFor="let rec of r.recomendaciones; let i = index" class="rec-item">
-                <span class="rec-icon">{{ i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉' }}</span>
-                <span class="rec-text">{{ rec }}</span>
-              </div>
-            </div>
-
-            <!-- Apply button -->
-            <div style="padding:16px 0 4px;border-top:1px solid var(--color-border);margin-top:12px;">
-              <button class="btn btn-primary" (click)="applyAISuggestions()">
-                ✅ Aplicar sugerencias al presupuesto
-              </button>
-              <span style="font-size:12px;color:var(--color-text-muted);margin-left:12px;">
-                Rellena automáticamente los límites de la tabla
-              </span>
-            </div>
-          </div>
-          </ng-container>
-        </div>
-
         <!-- Budget vs actual table -->
         <div class="card mb-6">
           <div class="card-header">
@@ -202,7 +90,47 @@ interface AISuggestion {
             <div class="empty-state-sub">Registra entradas en la sección <strong>Tu dinero</strong> para obtener sugerencias de plan mensual</div>
           </div>
 
-          <div class="table-wrapper" *ngIf="budgetRows.length > 0">
+          <div class="m-cards only-mobile" *ngIf="budgetRows.length > 0">
+            <div class="m-card" *ngFor="let row of budgetRows" [class.row-over]="row.status === 'over'" [class.row-warn]="row.status === 'warn'">
+              <div class="m-card-top">
+                <div class="m-card-title">{{ row.category.icon }} {{ row.category.name }}</div>
+                <span *ngIf="row.status === 'over'"  class="badge badge-danger">🔴 Excedido</span>
+                <span *ngIf="row.status === 'warn'"  class="badge badge-warning">🟡 Por exceder</span>
+                <span *ngIf="row.status === 'ok'"    class="badge badge-success">🟢 En control</span>
+                <span *ngIf="row.status === 'none'"  class="badge badge-muted">— Sin límite</span>
+              </div>
+              <div *ngIf="row.limit_amount > 0" class="progress-bar">
+                <div class="progress-fill"
+                     [style.width.%]="row.used_pct > 100 ? 100 : row.used_pct"
+                     [style.background]="row.status === 'over' ? '#ef4444' : row.status === 'warn' ? '#f59e0b' : '#10b981'"></div>
+              </div>
+              <div class="m-card-rows mono">
+                <div class="m-card-row"><span>Gasto real</span><span [class.text-danger]="row.status === 'over'">{{ row.actual | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>Disponible</span><span [class.text-primary]="row.limit_amount > 0 && row.actual < row.limit_amount" [class.text-danger]="row.status === 'over'">{{ row.limit_amount > 0 ? (row.limit_amount - row.actual | currency:'MXN':'symbol':'1.0-0') : '—' }}</span></div>
+                <div class="m-card-row"><span>Sugerido</span><span class="text-muted">{{ row.suggested | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+              </div>
+              <div class="m-card-edit">
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label">% del ingreso</label>
+                  <input type="number" class="form-control mono" [(ngModel)]="row.pct_of_income" (input)="onPctChange(row)" min="0" max="100" step="1" />
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label class="form-label">Límite mensual</label>
+                  <input type="number" class="form-control mono" [(ngModel)]="row.limit_amount" (input)="onLimitChange(row)" min="0" step="100" />
+                </div>
+              </div>
+            </div>
+            <div class="m-card" style="background:var(--color-surface-2);">
+              <div class="m-card-title">Total del plan</div>
+              <div class="m-card-rows mono">
+                <div class="m-card-row"><span>% del ingreso</span><span>{{ totalBudgetPct | number:'1.0-0' }}%</span></div>
+                <div class="m-card-row"><span>Límite total</span><span>{{ totalLimit | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>Gasto real</span><span class="text-danger">{{ totalActual | currency:'MXN':'symbol':'1.0-0' }}</span></div>
+                <div class="m-card-row"><span>Disponible</span><span [class.text-primary]="totalLimit - totalActual >= 0" [class.text-danger]="totalLimit - totalActual < 0">{{ totalLimit > 0 ? (totalLimit - totalActual | currency:'MXN':'symbol':'1.0-0') : '—' }}</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrapper only-desktop" *ngIf="budgetRows.length > 0">
             <table>
               <thead>
                 <tr>
@@ -406,7 +334,23 @@ interface AISuggestion {
           <div class="card-header">
             <span class="card-title">Gastos por persona — {{ monthName }} {{ currentYear }}</span>
           </div>
-          <div class="table-wrapper">
+          <div class="m-cards only-mobile" *ngIf="memberBreakdown.length > 0">
+            <div class="m-card" *ngFor="let mi of memberBreakdown">
+              <div class="m-card-top">
+                <div class="m-card-title"><span class="color-dot" [style.background]="mi.color" style="display:inline-block;margin-right:6px;"></span>{{ mi.name }}</div>
+                <div class="m-card-amount text-danger">{{ mi.expenses | currency:'MXN':'symbol':'1.0-0' }}</div>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill"
+                     [style.width.%]="mi.share > 100 ? 100 : mi.share"
+                     [style.background]="mi.share <= 35 ? '#10b981' : mi.share <= 50 ? '#f59e0b' : '#ef4444'"></div>
+              </div>
+              <div class="m-card-rows mono">
+                <div class="m-card-row"><span>% del gasto total</span><span [class.text-primary]="mi.share <= 35" [class.text-warning]="mi.share > 35 && mi.share <= 50" [class.text-danger]="mi.share > 50">{{ mi.share | number:'1.1-1' }}%</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrapper only-desktop">
             <table>
               <thead>
                 <tr>
@@ -445,11 +389,133 @@ interface AISuggestion {
           </div>
         </div>
 
+        <!-- Presupuesto sugerido con IA (al final: información complementaria) -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <span class="card-title">✨ Presupuesto sugerido con IA</span>
+            <span class="badge badge-muted" style="font-size:11px;">Claude Opus · Adaptive Thinking</span>
+          </div>
+          <div style="padding:16px 24px 20px;">
+
+            <!-- Income source toggle -->
+            <div class="ai-income-row">
+              <div style="font-size:13px;font-weight:600;color:var(--color-text);margin-bottom:10px;">Base de ingresos para sugerencia</div>
+              <div class="toggle-group mb-3">
+                <button class="toggle-btn" [class.active]="!aiManualIncome" (click)="aiManualIncome=false">
+                  📊 Usar entradas registradas
+                </button>
+                <button class="toggle-btn" [class.active]="aiManualIncome" (click)="aiManualIncome=true">
+                  ✏️ Ingresar manualmente
+                </button>
+              </div>
+              <div *ngIf="aiManualIncome" class="ai-input-row">
+                <label style="font-size:13px;color:var(--color-text-muted);margin-bottom:4px;display:block;">Ingreso mensual total (MXN)</label>
+                <input type="number" class="form-control" [(ngModel)]="aiIncomeInput"
+                       placeholder="Ej. 25000" min="0" step="500" style="max-width:240px;" />
+              </div>
+              <div *ngIf="!aiManualIncome" class="ai-income-preview">
+                <span class="text-muted" style="font-size:13px;">Usando entradas registradas:</span>
+                <span class="mono text-primary" style="font-size:15px;font-weight:700;margin-left:8px;">{{ totalIncome | currency:'MXN':'symbol':'1.0-0' }}</span>
+              </div>
+            </div>
+
+            <button class="btn btn-primary" style="margin-top:14px;gap:8px;"
+                    (click)="generateAI()" [disabled]="aiLoading || aiIncomeForRequest <= 0">
+              <span *ngIf="!aiLoading">✨ Generar presupuesto con IA</span>
+              <span *ngIf="aiLoading" style="display:flex;align-items:center;gap:8px;">
+                <span class="spinner-sm"></span> Analizando con IA...
+              </span>
+            </button>
+            <div *ngIf="aiError" class="ai-error">{{ aiError }}</div>
+
+          </div>
+
+          <!-- AI Results -->
+          <ng-container *ngIf="aiResult as r">
+          <div class="ai-result">
+            <div class="ai-result-header">
+              <div class="ai-health" [class]="'ai-health-' + r.salud_financiera">
+                <span class="ai-health-dot"></span>
+                Salud financiera:
+                <strong>{{ r.salud_financiera === 'buena' ? 'Buena' : r.salud_financiera === 'regular' ? 'Regular' : 'Crítica' }}</strong>
+              </div>
+              <div class="ai-savings">
+                <span class="text-muted" style="font-size:12px;">Ahorro sugerido</span>
+                <span class="mono text-primary" style="font-size:18px;font-weight:700;">{{ r.monto_ahorro | currency:'MXN':'symbol':'1.0-0' }}</span>
+                <span class="badge badge-success">{{ r.tasa_ahorro_sugerida }}%</span>
+              </div>
+            </div>
+
+            <div class="ai-summary">
+              <div style="font-size:13px;line-height:1.6;color:var(--color-text);">{{ r.resumen }}</div>
+            </div>
+
+            <!-- Alerts from AI -->
+            <div *ngIf="r.alertas?.length" class="ai-alerts">
+              <div *ngFor="let alerta of r.alertas" class="alert-item alert-yellow" style="margin-bottom:8px;">
+                <div class="alert-icon">⚠️</div>
+                <div class="alert-body">
+                  <div class="alert-detail">{{ alerta }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Category suggestions -->
+            <div class="ai-categories">
+              <div style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">
+                Distribución sugerida por categoría
+              </div>
+              <div class="ai-cat-grid">
+                <div *ngFor="let cat of r.categorias" class="ai-cat-card">
+                  <div class="ai-cat-header">
+                    <span style="font-weight:600;font-size:13px;">{{ cat.nombre }}</span>
+                    <span class="badge badge-muted mono">{{ cat.porcentaje }}%</span>
+                  </div>
+                  <div class="mono text-primary" style="font-size:16px;font-weight:700;">{{ cat.monto | currency:'MXN':'symbol':'1.0-0' }}</div>
+                  <div style="font-size:11px;color:var(--color-text-muted);margin-top:4px;line-height:1.4;">{{ cat.razon }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recommendations -->
+            <div *ngIf="r.recomendaciones?.length" class="ai-recs">
+              <div style="font-size:12px;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">
+                Recomendaciones
+              </div>
+              <div *ngFor="let rec of r.recomendaciones; let i = index" class="rec-item">
+                <span class="rec-icon">{{ i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉' }}</span>
+                <span class="rec-text">{{ rec }}</span>
+              </div>
+            </div>
+
+            <!-- Apply button -->
+            <div style="padding:16px 0 4px;border-top:1px solid var(--color-border);margin-top:12px;">
+              <button class="btn btn-primary" (click)="applyAISuggestions()">
+                ✅ Aplicar sugerencias al presupuesto
+              </button>
+              <span style="font-size:12px;color:var(--color-text-muted);margin-left:12px;">
+                Rellena automáticamente los límites de la tabla
+              </span>
+            </div>
+          </div>
+          </ng-container>
+        </div>
+
       </ng-container>
     </div>
   `,
   styles: [`
     .pct-input { display:flex; align-items:center; gap:4px; justify-content:flex-end; }
+
+    .m-card-edit {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px dashed var(--color-border);
+    }
+    .m-card-edit .form-label { margin-bottom: 4px; }
 
     .row-over td { background: rgba(239,68,68,0.04); }
     .row-warn td { background: rgba(245,158,11,0.04); }

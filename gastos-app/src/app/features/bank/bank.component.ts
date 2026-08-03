@@ -73,7 +73,7 @@ const BANK_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef
           <div *ngIf="cardReserveRows.length === 0" class="empty-state">
             <div class="empty-state-title">Sin liquidaciones de tarjeta para este mes</div>
           </div>
-          <div class="table-wrapper" *ngIf="cardReserveRows.length > 0">
+          <div class="table-wrapper only-desktop" *ngIf="cardReserveRows.length > 0">
             <table>
               <thead><tr><th>Fecha limite</th><th>Tarjeta</th><th>Compras</th><th class="text-right">Monto</th></tr></thead>
               <tbody>
@@ -85,6 +85,17 @@ const BANK_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="m-cards only-mobile" *ngIf="cardReserveRows.length > 0">
+            <div class="m-card" *ngFor="let reserve of cardReserveRows">
+              <div class="m-card-top">
+                <div>
+                  <div class="m-card-title">{{ reserve.methodName }}</div>
+                  <div class="m-card-sub">Límite {{ reserve.dueDate | date:'dd/MM/yyyy' }} · {{ reserve.count }} compra{{ reserve.count !== 1 ? 's' : '' }}</div>
+                </div>
+                <div class="m-card-amount text-danger">{{ reserve.total | currency:'MXN':'symbol':'1.0-0' }}</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -103,7 +114,7 @@ const BANK_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef
               </select>
             </div>
           </div>
-          <div class="table-wrapper" *ngIf="filtered.length > 0">
+          <div class="table-wrapper only-desktop" *ngIf="filtered.length > 0">
             <table>
               <thead><tr><th>Fecha</th><th>Descripcion</th><th *ngIf="!selectedAccountId">Cuenta</th><th>Tipo</th><th class="text-right">Monto</th><th></th></tr></thead>
               <tbody>
@@ -120,6 +131,22 @@ const BANK_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="m-cards only-mobile" *ngIf="filtered.length > 0">
+            <div class="m-card" *ngFor="let mov of filtered">
+              <div class="m-card-top">
+                <div>
+                  <div class="m-card-title">{{ mov.description }}</div>
+                  <div class="m-card-sub">{{ mov.date | date:'dd/MM/yyyy' }}<span *ngIf="!selectedAccountId"> · {{ mov.account_name }}</span> · {{ mov.type === 'ingreso' ? 'Entrada' : 'Salida' }}</div>
+                  <div class="m-card-sub" *ngIf="mov.notes">{{ mov.notes }}</div>
+                </div>
+                <div class="m-card-amount" [class.text-primary]="mov.type==='ingreso'" [class.text-danger]="mov.type==='egreso'">{{ mov.amount | currency:'MXN':'symbol':'1.2-2' }}</div>
+              </div>
+              <div class="m-card-actions">
+                <button *ngIf="!mov.transfer_group_id" class="btn btn-secondary btn-sm" (click)="openMovementModal(mov)">Editar</button>
+                <button class="btn btn-danger btn-sm" (click)="deleteMovement(mov)">Eliminar</button>
+              </div>
+            </div>
           </div>
           <div *ngIf="filtered.length === 0" class="empty-state"><div class="empty-state-title">Sin movimientos en este periodo</div></div>
         </div>

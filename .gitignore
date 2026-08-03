@@ -3,3 +3,4 @@ node_modules
 gastos-app/.angular/
 gastos-app/dist/
 .claude/settings.local.json
+.claude/
