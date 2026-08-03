@@ -71,6 +71,7 @@ body {
   font-size: 14px;
   line-height: 1.6;
   overflow-x: hidden;
+  overscroll-behavior-y: contain; /* evita el rebote/recarga nativa; usamos pull-to-refresh propio */
 }
 
 /* ── Scrollbar ──────────────────────────────── */

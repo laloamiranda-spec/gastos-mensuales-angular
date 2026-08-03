@@ -16,6 +16,11 @@ import { filter } from 'rxjs';
     <router-outlet *ngIf="isBareRoute" />
 
     <div class="app-layout" *ngIf="!isBareRoute">
+      <!-- Pull-to-refresh: indicador al deslizar hacia abajo desde arriba -->
+      <div class="ptr" *ngIf="ptrPull > 0 || ptrRefreshing" [style.transform]="'translateY(' + (ptrRefreshing ? 24 : ptrPull) + 'px)'">
+        <div class="ptr-circle" [class.ready]="ptrReady" [class.spinning]="ptrRefreshing" [style.transform]="'rotate(' + (ptrPull * 3) + 'deg)'">↻</div>
+      </div>
+
       <div class="mobile-backdrop" [class.open]="mobileNavOpen" (click)="closeMobileNav()"></div>
 
       <aside class="sidebar" [class.open]="mobileNavOpen">
@@ -112,10 +117,13 @@ import { filter } from 'rxjs';
         </div>
 
         <div class="mobile-topbar">
-          <select *ngIf="households.length > 0" class="mobile-household-select" [(ngModel)]="selectedHouseholdId" (ngModelChange)="onHouseholdChange($event)">
-            <option *ngFor="let household of households" [value]="household.id">{{ household.name }}</option>
-          </select>
-          <span *ngIf="households.length === 0" class="mobile-brand-name">FinanzasCasa</span>
+          <div class="mobile-topbar-top">
+            <select *ngIf="households.length > 0" class="mobile-household-select" [(ngModel)]="selectedHouseholdId" (ngModelChange)="onHouseholdChange($event)">
+              <option *ngFor="let household of households" [value]="household.id">{{ household.name }}</option>
+            </select>
+            <span *ngIf="households.length === 0" class="mobile-brand-name" style="flex:1;">FinanzasCasa</span>
+            <button class="mobile-refresh-btn" type="button" (click)="refresh()" [class.spinning]="ptrRefreshing" aria-label="Actualizar">↻</button>
+          </div>
           <button class="mobile-capture-btn" type="button" routerLink="/capturar" aria-label="Registrar gasto">
             <span class="mobile-capture-plus">+</span>
             <span>Registrar gasto</span>
@@ -440,7 +448,14 @@ import { filter } from 'rxjs';
       font-size: 15px;
     }
 
+    .mobile-topbar-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .mobile-household-select {
+      flex: 1;
       width: 100%;
       min-width: 0;
       border: 1px solid var(--color-border);
@@ -451,6 +466,54 @@ import { filter } from 'rxjs';
       font-size: 14px;
       font-weight: 600;
     }
+
+    .mobile-refresh-btn {
+      flex-shrink: 0;
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--color-primary);
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-card);
+    }
+
+    .mobile-refresh-btn.spinning { animation: ptrSpin 0.8s linear infinite; }
+
+    /* Indicador de pull-to-refresh */
+    .ptr {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      margin-left: -18px;
+      z-index: 95;
+      pointer-events: none;
+    }
+
+    .ptr-circle {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-card);
+      color: var(--color-text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .ptr-circle.ready { color: var(--color-primary); border-color: var(--color-primary); }
+    .ptr-circle.spinning { color: var(--color-primary); animation: ptrSpin 0.8s linear infinite; }
+
+    @keyframes ptrSpin { to { transform: rotate(360deg); } }
 
     .mobile-capture-btn {
       align-self: center;
@@ -657,6 +720,14 @@ export class AppComponent implements OnInit {
   isBareRoute = false;
   showQuickCapture = false;
 
+  // Pull-to-refresh (deslizar hacia abajo desde arriba)
+  ptrPull = 0;
+  ptrReady = false;
+  ptrRefreshing = false;
+  private ptrStartY = 0;
+  private ptrTracking = false;
+  private readonly PTR_THRESHOLD = 70;
+
   get currentHousehold() {
     return this.households.find(household => household.id === this.selectedHouseholdId) || null;
   }
@@ -742,6 +813,53 @@ export class AppComponent implements OnInit {
   onResize() {
     if (window.innerWidth > 900) {
       this.closeMobileNav();
+    }
+  }
+
+  /** Recarga la app: recupera de un estado colgado y refresca datos. */
+  refresh() {
+    if (this.ptrRefreshing) return;
+    this.ptrRefreshing = true;
+    setTimeout(() => window.location.reload(), 150);
+  }
+
+  @HostListener('window:touchstart', ['$event'])
+  onTouchStart(e: TouchEvent) {
+    if (this.isBareRoute || this.ptrRefreshing || this.mobileNavOpen || e.touches.length !== 1) {
+      this.ptrTracking = false;
+      return;
+    }
+    if (window.scrollY <= 0) {
+      this.ptrStartY = e.touches[0].clientY;
+      this.ptrTracking = true;
+    } else {
+      this.ptrTracking = false;
+    }
+  }
+
+  @HostListener('window:touchmove', ['$event'])
+  onTouchMove(e: TouchEvent) {
+    if (!this.ptrTracking || this.ptrRefreshing) return;
+    const dy = e.touches[0].clientY - this.ptrStartY;
+    if (dy > 0 && window.scrollY <= 0) {
+      this.ptrPull = Math.min(dy * 0.5, 90);
+      this.ptrReady = this.ptrPull >= this.PTR_THRESHOLD;
+    } else {
+      this.ptrPull = 0;
+      this.ptrReady = false;
+      this.ptrTracking = false;
+    }
+  }
+
+  @HostListener('window:touchend')
+  onTouchEnd() {
+    if (!this.ptrTracking) return;
+    this.ptrTracking = false;
+    if (this.ptrReady) {
+      this.refresh();
+    } else {
+      this.ptrPull = 0;
+      this.ptrReady = false;
     }
   }
 }
