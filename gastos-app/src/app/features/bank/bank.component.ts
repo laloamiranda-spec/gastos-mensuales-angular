@@ -193,14 +193,28 @@ const BANK_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef
               <div class="form-group"><label class="form-label">Cuenta *</label><select class="form-control" [(ngModel)]="movForm.account_id"><option value="">Seleccionar...</option><option *ngFor="let acc of accounts" [value]="acc.id">{{ acc.name }} - {{ acc.bank }}</option></select></div>
               <div class="form-group"><label class="form-label">Fecha *</label><input class="form-control mono" type="date" [(ngModel)]="movForm.date" /></div>
             </div>
+            <div class="form-group" *ngIf="movForm.type === 'ingreso' && !editingMovement">
+              <label class="form-label">¿Cómo llega el ingreso?</label>
+              <div class="flex gap-2">
+                <button class="btn" style="flex:1;" [class.btn-primary]="!movQuincenal" [class.btn-secondary]="movQuincenal" (click)="movQuincenal=false">Un depósito</button>
+                <button class="btn" style="flex:1;" [class.btn-primary]="movQuincenal" [class.btn-secondary]="!movQuincenal" (click)="movQuincenal=true">Por quincena</button>
+              </div>
+            </div>
             <div class="form-row">
               <div class="form-group"><label class="form-label">Descripcion *</label><input class="form-control" [(ngModel)]="movForm.description" /></div>
-              <div class="form-group"><label class="form-label">Monto *</label><input class="form-control mono" type="number" [(ngModel)]="movForm.amount" step="0.01" min="0" /></div>
+              <div class="form-group" *ngIf="!isQuincenalIncome"><label class="form-label">Monto *</label><input class="form-control mono" type="number" [(ngModel)]="movForm.amount" step="0.01" min="0" /></div>
+            </div>
+            <div class="form-row" *ngIf="isQuincenalIncome">
+              <div class="form-group"><label class="form-label">1ª quincena (día 15)</label><input class="form-control mono" type="number" [(ngModel)]="movQ1" step="0.01" min="0" /></div>
+              <div class="form-group"><label class="form-label">2ª quincena (fin de mes)</label><input class="form-control mono" type="number" [(ngModel)]="movQ2" step="0.01" min="0" /></div>
+            </div>
+            <div class="text-muted" style="font-size:11px;margin-bottom:12px;" *ngIf="isQuincenalIncome">
+              Se crean dos entradas: día 15 y fin de mes (usa la <strong>Fecha</strong> de arriba para elegir el mes).
             </div>
             <div class="form-group"><label class="form-label">Categoria</label><select class="form-control" [(ngModel)]="movForm.category_id"><option value="">Sin categoria</option><option *ngFor="let cat of categories" [value]="cat.id">{{ cat.name }}</option></select></div>
             <div class="form-group"><label class="form-label">Notas</label><input class="form-control" [(ngModel)]="movForm.notes" /></div>
           </div>
-          <div class="modal-footer"><button class="btn btn-secondary" (click)="closeMovementModal()">Cancelar</button><button class="btn btn-primary" (click)="saveMovement()" [disabled]="savingMovement || !movForm.account_id || !movForm.description || !movForm.amount">{{ savingMovement ? 'Guardando...' : 'Guardar' }}</button></div>
+          <div class="modal-footer"><button class="btn btn-secondary" (click)="closeMovementModal()">Cancelar</button><button class="btn btn-primary" (click)="saveMovement()" [disabled]="savingMovement || !canSaveMovement">{{ savingMovement ? 'Guardando...' : 'Guardar' }}</button></div>
         </div>
       </div>
 
@@ -268,6 +282,10 @@ export class BankComponent implements OnInit {
   savingMovement = false;
   editMovementId = '';
   movForm: BankMovement = { account_id: '', description: '', amount: 0, type: 'egreso', date: this.today() };
+  // Captura de ingreso por quincena (crea dos entradas: día 15 y fin de mes)
+  movQuincenal = false;
+  movQ1 = 0;
+  movQ2 = 0;
   showTransferModal = false;
   savingTransfer = false;
   transferForm = { from_account_id: '', to_account_id: '', amount: 0, date: this.today(), notes: '' };
@@ -388,19 +406,49 @@ export class BankComponent implements OnInit {
   openMovementModal(mov?: BankMovement) {
     this.editingMovement = !!mov;
     this.editMovementId = mov?.id || '';
+    this.movQuincenal = false;
+    this.movQ1 = 0;
+    this.movQ2 = 0;
     this.movForm = mov ? { ...mov } : { account_id: this.selectedAccountId || (this.accounts[0]?.id || ''), description: '', amount: 0, type: 'egreso', date: this.today(), category_id: '', notes: '' };
     this.showMovementModal = true;
   }
 
   closeMovementModal() { this.showMovementModal = false; }
 
+  get isQuincenalIncome() { return this.movQuincenal && this.movForm.type === 'ingreso' && !this.editingMovement; }
+  get canSaveMovement() {
+    if (!this.movForm.account_id || !this.movForm.description) return false;
+    return this.isQuincenalIncome ? (this.movQ1 > 0 || this.movQ2 > 0) : !!this.movForm.amount;
+  }
+
+  /** Fecha de la quincena (1 = día 15, 2 = último día del mes) según el mes de movForm.date. */
+  private quincenaDate(which: 1 | 2): string {
+    const [y, m] = (this.movForm.date || this.today()).split('-').map(Number);
+    if (which === 1) return `${y}-${String(m).padStart(2, '0')}-15`;
+    const last = new Date(y, m, 0).getDate();
+    return `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+  }
+
   async saveMovement() {
-    if (!this.movForm.account_id || !this.movForm.description || !this.movForm.amount) return;
+    if (!this.canSaveMovement) return;
     this.savingMovement = true;
     try {
-      const payload = { account_id: this.movForm.account_id, category_id: this.movForm.category_id || null, description: this.movForm.description, amount: this.movForm.amount, type: this.movForm.type, date: this.movForm.date, notes: this.movForm.notes || null };
-      if (this.editingMovement) await this.supabase.updateBankMovement(this.editMovementId, payload);
-      else await this.supabase.createBankMovement(payload);
+      const base = (amount: number, date: string, suffix?: string) => ({
+        account_id: this.movForm.account_id,
+        category_id: this.movForm.category_id || null,
+        description: suffix ? `${this.movForm.description} · ${suffix}` : this.movForm.description,
+        amount, type: this.movForm.type, date,
+        notes: this.movForm.notes || null,
+      });
+
+      if (this.isQuincenalIncome) {
+        if (this.movQ1 > 0) await this.supabase.createBankMovement(base(this.movQ1, this.quincenaDate(1), '1ª quincena'));
+        if (this.movQ2 > 0) await this.supabase.createBankMovement(base(this.movQ2, this.quincenaDate(2), '2ª quincena'));
+      } else if (this.editingMovement) {
+        await this.supabase.updateBankMovement(this.editMovementId, base(this.movForm.amount, this.movForm.date));
+      } else {
+        await this.supabase.createBankMovement(base(this.movForm.amount, this.movForm.date));
+      }
       await this.loadMovements();
       this.closeMovementModal();
     } catch (e) {

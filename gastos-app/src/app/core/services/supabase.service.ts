@@ -16,6 +16,10 @@ export class SupabaseService {
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: false,
+          // Desactiva el bloqueo entre pestañas (navigator.locks) que provoca
+          // NavigatorLockAcquireTimeoutError y cuelga la sesión. Para un usuario
+          // por dispositivo es seguro; evita que la app se quede "pasmada".
+          lock: (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => fn(),
         },
       });
     }
@@ -924,6 +928,60 @@ export class SupabaseService {
     return Array.from(rows.values()).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   }
 
+  /**
+   * Pagos de tarjeta agrupados por mes de vencimiento, para una ventana de N meses
+   * a partir de (fromYear, fromMonth). Devuelve un mapa "YYYY-M" -> filas por tarjeta+fecha.
+   */
+  async getUpcomingCardPayments(fromYear: number, fromMonth: number, months: number): Promise<Record<string, any[]>> {
+    const windowStart = fromYear * 12 + (fromMonth - 1);
+    const windowEnd = windowStart + (months - 1);
+    // Ocurrencias desde un mes antes (cargos que se pagan en el primer mes de la ventana).
+    const sAbs = windowStart - 1;
+    const sY = Math.floor(sAbs / 12), sM = (sAbs % 12) + 1;
+    const eY = Math.floor(windowEnd / 12), eM = (windowEnd % 12) + 1;
+
+    const occurrences = await this.getExpenseOccurrencesInRange(
+      this.isoDate(sY, sM, 1),
+      this.isoDate(eY, eM, new Date(eY, eM, 0).getDate()),
+    );
+    const paymentMethods = await this.getPaymentMethods();
+
+    const result: Record<string, any[]> = {};
+    const rowMap = new Map<string, any>();
+
+    for (const occurrence of (occurrences || [])) {
+      const obligations = this.resolveCreditCardReserveObligations(occurrence, paymentMethods);
+      for (const ob of obligations) {
+        if (!ob.dueDate) continue;
+        const due = this.parseIsoDate(ob.dueDate);
+        const dAbs = due.getFullYear() * 12 + due.getMonth();
+        if (dAbs < windowStart || dAbs > windowEnd) continue;
+
+        const monthKey = `${due.getFullYear()}-${due.getMonth() + 1}`;
+        const key = `${monthKey}__${ob.methodId}__${ob.dueDate}`;
+        if (!rowMap.has(key)) {
+          const row = {
+            methodName: ob.methodName,
+            methodColor: ob.methodColor,
+            dueDate: ob.dueDate,
+            total: 0,
+            count: 0,
+          };
+          rowMap.set(key, row);
+          (result[monthKey] ||= []).push(row);
+        }
+        const row = rowMap.get(key)!;
+        row.total += ob.amount;
+        row.count += 1;
+      }
+    }
+
+    for (const monthKey of Object.keys(result)) {
+      result[monthKey].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    }
+    return result;
+  }
+
   // ── AI BUDGET SUGGESTION ─────────────────────
   async generateBudgetSuggestion(payload: {
     income: number;
@@ -1325,6 +1383,17 @@ export class SupabaseService {
     const occurrenceDate = expense.occurrence_date || null;
     if (!occurrenceDate) return [];
 
+    // En diferidos, la ocurrencia YA es el mes de pago: no se vuelve a correr por el corte.
+    const occ = this.parseIsoDate(occurrenceDate);
+    const dueFor = (pm: any) => {
+      if (expense.is_deferred) {
+        return pm?.payment_due_day
+          ? this.formatDate(this.resolveDateWithDay(occ.getFullYear(), occ.getMonth() + 1, pm.payment_due_day))
+          : this.formatDate(occ);
+      }
+      return this.resolveExpenseDueDate(occurrenceDate, pm, true);
+    };
+
     const paidWithCreditCard = expense.paid_payment_method_type === 'tarjeta_credito'
       && (!!expense.paid_payment_method_id || !!expense.paid_payment_method_name);
     const plannedCreditCard = expense.payment_method_type === 'tarjeta_credito'
@@ -1333,7 +1402,7 @@ export class SupabaseService {
     if (paidWithCreditCard) {
       const paymentMethod = paymentMethods.find(method => method.id === expense.paid_payment_method_id);
       return [{
-        dueDate: this.resolveExpenseDueDate(occurrenceDate, paymentMethod, true),
+        dueDate: dueFor(paymentMethod),
         methodId: expense.paid_payment_method_id || expense.paid_payment_method_name,
         methodName: expense.paid_payment_method_name || 'Tarjeta de credito',
         methodColor: paymentMethod?.color || expense.payment_method_color || '#ef4444',
@@ -1344,7 +1413,7 @@ export class SupabaseService {
     if (plannedCreditCard && !expense.paid_payment_method_id) {
       const paymentMethod = paymentMethods.find(method => method.id === expense.payment_method_id);
       return [{
-        dueDate: this.resolveExpenseDueDate(occurrenceDate, paymentMethod, true),
+        dueDate: dueFor(paymentMethod),
         methodId: expense.payment_method_id || expense.payment_method_name,
         methodName: expense.payment_method_name || 'Tarjeta de credito',
         methodColor: paymentMethod?.color || expense.payment_method_color || '#ef4444',
@@ -1353,6 +1422,30 @@ export class SupabaseService {
     }
 
     return [];
+  }
+
+  /**
+   * Primer mes de PAGO de una compra a tarjeta, según la fecha de compra y el
+   * corte/límite de la tarjeta. Ej: compra 12-may, corte 19 → cierra 19-may →
+   * primer pago en junio.
+   */
+  computeFirstPaymentMonth(purchaseDateIso: string | null, paymentMethod: any): { month: number; year: number } | null {
+    const base = purchaseDateIso ? this.parseIsoDate(purchaseDateIso) : null;
+    if (!base) return null;
+    if (paymentMethod?.billing_cutoff_day && paymentMethod?.payment_due_day) {
+      const due = this.resolveFirstDueDateAfter(
+        this.resolveStatementCloseDate(base, paymentMethod.billing_cutoff_day),
+        paymentMethod.payment_due_day,
+      );
+      return { month: due.getMonth() + 1, year: due.getFullYear() };
+    }
+    if (paymentMethod?.payment_due_day) {
+      // Sin corte: el pago cae el mes siguiente a la compra.
+      const nextMonth = base.getMonth() + 1 === 12 ? 1 : base.getMonth() + 2;
+      const nextYear = base.getMonth() + 1 === 12 ? base.getFullYear() + 1 : base.getFullYear();
+      return { month: nextMonth, year: nextYear };
+    }
+    return { month: base.getMonth() + 1, year: base.getFullYear() };
   }
 
   private resolveExpenseDueDate(baseDateIso: string | null, paymentMethod: any, treatAsCreditCard: boolean) {
