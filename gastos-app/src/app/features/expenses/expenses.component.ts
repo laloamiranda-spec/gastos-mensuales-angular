@@ -95,9 +95,13 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
             <div class="expense-mobile-meta">
               <span class="badge" [class.badge-success]="exp.is_paid" [class.badge-warning]="!exp.is_paid">{{ exp.is_paid ? 'Pagado' : 'Pendiente' }}</span>
               <span class="badge" [class.badge-info]="exp.is_fixed" [class.badge-muted]="!exp.is_fixed">{{ exp.is_fixed ? 'Fijo' : 'Variable' }}</span>
+              <span class="badge badge-purple" *ngIf="getInstallment(exp) as inst">📅 {{ inst.current }}/{{ inst.total }}</span>
             </div>
             <div class="expense-mobile-details">
               <div>{{ getRecurrenceSummary(exp) }}</div>
+              <div *ngIf="getInstallment(exp) as inst" style="font-weight:600;color:var(--color-accent);">
+                Mensualidad {{ inst.current }} de {{ inst.total }} · {{ inst.remaining > 0 ? 'faltan ' + inst.remaining : '¡última!' }}
+              </div>
               <div *ngIf="exp.payment_method_name">Previsto: {{ exp.payment_method_name }}</div>
             </div>
             <div class="expense-mobile-actions">
@@ -129,6 +133,9 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
                 <td>
                   <div style="font-weight:600;">{{ exp.description }}</div>
                   <div class="text-muted" style="font-size:11px;">{{ getRecurrenceSummary(exp) }}</div>
+                  <div *ngIf="getInstallment(exp) as inst" style="font-size:11px;font-weight:700;color:var(--color-primary);">
+                    📅 Mensualidad {{ inst.current }}/{{ inst.total }} · {{ inst.remaining > 0 ? 'faltan ' + inst.remaining : '¡última!' }}
+                  </div>
                 </td>
                 <td>{{ exp.member_name || 'Hogar' }}</td>
                 <td class="mono">{{ exp.occurrence_date | date:'dd/MM/yyyy' }}</td>
@@ -145,6 +152,55 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div class="card mb-6 planning-card" *ngIf="!loading && projection.length">
+        <div class="card-header">
+          <span class="card-title">📅 Planeación a futuro</span>
+          <span class="badge badge-muted">próximos 6 meses</span>
+        </div>
+
+        <div class="plan-stats">
+          <div class="plan-stat">
+            <div class="stat-label">Deuda en mensualidades</div>
+            <div class="stat-value mono text-danger">{{ installmentDebt | currency:'MXN':'symbol':'1.0-0' }}</div>
+            <div class="stat-delta">{{ endingPlans.length }} plan{{ endingPlans.length !== 1 ? 'es' : '' }} a plazos activo{{ endingPlans.length !== 1 ? 's' : '' }}</div>
+          </div>
+          <div class="plan-stat">
+            <div class="stat-label">Comprometido este mes</div>
+            <div class="stat-value mono">{{ projection[0].total | currency:'MXN':'symbol':'1.0-0' }}</div>
+            <div class="stat-delta">Suma de gastos activos</div>
+          </div>
+        </div>
+
+        <div class="plan-subtitle">Gasto comprometido por mes</div>
+        <div class="plan-months">
+          <div class="plan-month" *ngFor="let p of projection" [class.is-current]="p.isCurrent">
+            <div class="plan-month-row">
+              <span class="plan-month-label">{{ p.label }}<span *ngIf="p.isCurrent" class="plan-now">actual</span></span>
+              <span class="plan-month-total mono">{{ p.total | currency:'MXN':'symbol':'1.0-0' }}</span>
+            </div>
+            <div class="plan-freed" *ngFor="let f of p.freed">
+              ✅ Se libera <strong>{{ f.amount | currency:'MXN':'symbol':'1.0-0' }}</strong> — termina “{{ f.desc }}”
+            </div>
+          </div>
+        </div>
+
+        <ng-container *ngIf="endingPlans.length">
+          <div class="plan-subtitle" style="margin-top:18px;">Planes a plazos</div>
+          <div class="plan-list">
+            <div class="plan-item" *ngFor="let e of endingPlans">
+              <div class="plan-item-main">
+                <div class="plan-item-desc">{{ e.desc }}</div>
+                <div class="plan-item-sub">Mensualidad {{ e.current }}/{{ e.total }} · termina {{ e.endLabel }}</div>
+              </div>
+              <div class="plan-item-right">
+                <div class="mono">{{ e.amount | currency:'MXN':'symbol':'1.0-0' }}<span class="plan-permonth">/mes</span></div>
+                <div class="plan-item-remaining">{{ e.remaining > 0 ? 'faltan ' + e.remaining : '¡última!' }}</div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
       </div>
 
       <div class="modal-overlay" *ngIf="showPayModal">
@@ -456,6 +512,105 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
       margin-top: 14px;
     }
     .expense-mobile-actions .btn { width: 100%; }
+
+    /* Planeación a futuro */
+    .plan-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .plan-stat {
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .plan-subtitle {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-text-muted);
+      margin-bottom: 10px;
+    }
+    .plan-months {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .plan-month {
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: var(--color-surface);
+    }
+    .plan-month.is-current {
+      border-color: var(--color-primary);
+      background: var(--color-primary-glow);
+    }
+    .plan-month-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .plan-month-label {
+      font-weight: 700;
+      color: var(--color-accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .plan-now {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #fff;
+      background: var(--color-primary);
+      border-radius: 100px;
+      padding: 2px 8px;
+    }
+    .plan-month-total {
+      font-weight: 700;
+      color: var(--color-accent);
+      font-size: 15px;
+    }
+    .plan-freed {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--color-primary-dim);
+      background: rgba(11,143,106,0.08);
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+    .plan-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .plan-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: var(--color-surface);
+    }
+    .plan-item-desc { font-weight: 700; color: var(--color-accent); }
+    .plan-item-sub { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+    .plan-item-right { text-align: right; white-space: nowrap; }
+    .plan-item-right .mono { font-weight: 700; color: var(--color-danger); }
+    .plan-permonth { font-size: 11px; color: var(--color-text-muted); font-weight: 500; }
+    .plan-item-remaining { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
+
+    @media (max-width: 560px) {
+      .plan-stats { grid-template-columns: 1fr; }
+    }
+
     @media (max-width: 900px) {
       .expenses-hero-actions {
         width: 100%;
@@ -482,6 +637,12 @@ export class ExpensesComponent implements OnInit {
   members: Member[] = [];
   categories: Category[] = [];
   paymentMethods: PaymentMethod[] = [];
+
+  // Planeación a futuro
+  baseExpenses: Expense[] = [];
+  installmentDebt = 0;
+  projection: { label: string; total: number; freed: { desc: string; amount: number }[]; isCurrent: boolean }[] = [];
+  endingPlans: { desc: string; amount: number; endLabel: string; current: number; total: number; remaining: number; endAbs: number }[] = [];
 
   loading = true;
   showModal = false;
@@ -529,11 +690,65 @@ export class ExpensesComponent implements OnInit {
     this.loading = true;
     try {
       this.allExpenses = await this.supabase.getExpenseOccurrences(this.currentYear, this.currentMonth) || [];
+      this.baseExpenses = await this.supabase.getExpenses() || [];
     } catch (error) {
       console.error(error);
     }
     this.filterExpenses();
+    this.buildPlanning();
     this.loading = false;
+  }
+
+  /** Índice absoluto de mes para aritmética (año*12 + mes-1). */
+  private absMonth(year: number, month: number) { return year * 12 + (month - 1); }
+
+  /** Calcula deuda en mensualidades, proyección de 6 meses y planes que terminan. */
+  buildPlanning() {
+    const base = this.baseExpenses || [];
+    const nowAbs = this.absMonth(this.currentYear, this.currentMonth);
+
+    // Deuda restante en mensualidades (planes finitos aún vigentes) + planes que terminan
+    let debt = 0;
+    const ending: typeof this.endingPlans = [];
+    for (const exp of base) {
+      const total = Number(exp.months_duration ?? 0);
+      if (exp.recurrence_type === 'semanal' || total <= 0) continue;
+      const startAbs = this.absMonth(exp.start_year, exp.start_month);
+      const endAbs = startAbs + total - 1;
+      if (endAbs < nowAbs) continue; // ya terminó
+      const current = Math.max(1, nowAbs - startAbs + 1);
+      const remaining = Math.max(0, endAbs - nowAbs); // mensualidades por pagar después del mes actual
+      debt += remaining * Number(exp.amount || 0);
+      ending.push({
+        desc: exp.description,
+        amount: Number(exp.amount || 0),
+        endLabel: MONTHS[endAbs % 12] + ' ' + Math.floor(endAbs / 12),
+        current, total, remaining, endAbs,
+      });
+    }
+    this.installmentDebt = debt;
+    ending.sort((a, b) => a.endAbs - b.endAbs);
+    this.endingPlans = ending;
+
+    // Proyección de los próximos 6 meses (desde el mes actual)
+    const rows: typeof this.projection = [];
+    for (let i = 0; i < 6; i++) {
+      const abs = nowAbs + i;
+      const y = Math.floor(abs / 12);
+      const m = (abs % 12) + 1;
+      let total = 0;
+      const freed: { desc: string; amount: number }[] = [];
+      for (const exp of base) {
+        total += this.supabase.getExpenseAmountForMonth(exp, m, y);
+        const dur = Number(exp.months_duration ?? 0);
+        if (dur > 0 && exp.recurrence_type !== 'semanal') {
+          const endAbs = this.absMonth(exp.start_year, exp.start_month) + dur - 1;
+          if (endAbs === abs) freed.push({ desc: exp.description, amount: Number(exp.amount || 0) });
+        }
+      }
+      rows.push({ label: MONTHS[m - 1] + ' ' + y, total, freed, isCurrent: i === 0 });
+    }
+    this.projection = rows;
   }
 
   setTab(tab: string) {
@@ -699,6 +914,32 @@ export class ExpensesComponent implements OnInit {
 
   getPaymentMethodIcon(type?: PaymentMethodType): string {
     return PAYMENT_METHOD_TYPES.find(item => item.value === type)?.icon || '💳';
+  }
+
+  /**
+   * Mensualidad a la que corresponde este gasto en el mes visible y cuántas faltan.
+   * Solo aplica a gastos mensuales con duración definida (months_duration > 0).
+   */
+  getInstallment(exp?: Expense | ExpenseOccurrence): { current: number; total: number; remaining: number } | null {
+    if (!exp || exp.recurrence_type === 'semanal') return null;
+    const total = Number(exp.months_duration ?? 0);
+    const sm = Number(exp.start_month ?? 0);
+    const sy = Number(exp.start_year ?? 0);
+    if (total <= 0 || sm <= 0 || sy <= 0) return null; // 0 = indefinido → sin mensualidades
+
+    // Mes/año de esta ocurrencia (o el mes visible si no hay fecha)
+    let month = this.currentMonth;
+    let year = this.currentYear;
+    const occ = (exp as ExpenseOccurrence).occurrence_date;
+    if (occ) {
+      const d = new Date(occ + 'T00:00:00');
+      month = d.getMonth() + 1;
+      year = d.getFullYear();
+    }
+
+    const current = (year - sy) * 12 + (month - sm) + 1;
+    if (current < 1 || current > total) return null;
+    return { current, total, remaining: total - current };
   }
 
   private emptyForm(): Expense {
