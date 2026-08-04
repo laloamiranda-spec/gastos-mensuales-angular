@@ -167,19 +167,59 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
             <div class="stat-delta">{{ endingPlans.length }} plan{{ endingPlans.length !== 1 ? 'es' : '' }} a plazos activo{{ endingPlans.length !== 1 ? 's' : '' }}</div>
           </div>
           <div class="plan-stat">
-            <div class="stat-label">Comprometido este mes</div>
-            <div class="stat-value mono">{{ projection[0].total | currency:'MXN':'symbol':'1.0-0' }}</div>
-            <div class="stat-delta">Suma de gastos activos</div>
+            <div class="stat-label">Neto este mes (ingresos − egresos)</div>
+            <div class="stat-value mono" [class.text-primary]="currentProjection.net >= 0" [class.text-danger]="currentProjection.net < 0">{{ currentProjection.net | currency:'MXN':'symbol':'1.0-0' }}</div>
+            <div class="stat-delta">Egresos {{ currentProjection.egresos | currency:'MXN':'symbol':'1.0-0' }}</div>
           </div>
         </div>
 
-        <div class="plan-subtitle">Gasto comprometido por mes</div>
+        <div class="plan-subtitle">Flujo de efectivo por mes (cuando el dinero sale/entra)</div>
         <div class="plan-months">
-          <div class="plan-month" *ngFor="let p of projection" [class.is-current]="p.isCurrent">
+          <div class="plan-month" *ngFor="let p of projection" [class.is-current]="p.isCurrent" [class.is-past]="p.isPast">
             <div class="plan-month-row">
-              <span class="plan-month-label">{{ p.label }}<span *ngIf="p.isCurrent" class="plan-now">actual</span></span>
-              <span class="plan-month-total mono">{{ p.total | currency:'MXN':'symbol':'1.0-0' }}</span>
+              <span class="plan-month-label">
+                {{ p.label }}
+                <span *ngIf="p.isCurrent" class="plan-now">actual</span>
+                <span *ngIf="p.isPast" class="plan-past">pasado</span>
+              </span>
+              <span class="plan-month-net mono" [class.text-primary]="p.net >= 0" [class.text-danger]="p.net < 0">{{ p.net | currency:'MXN':'symbol':'1.0-0' }}</span>
             </div>
+
+            <div class="plan-flow">
+              <span class="plan-flow-in">
+                Ingresos {{ p.income | currency:'MXN':'symbol':'1.0-0' }}
+                <span class="plan-flow-tag" *ngIf="p.incomeEstimated">estimado</span>
+              </span>
+              <span class="plan-flow-out">Egresos {{ p.egresos | currency:'MXN':'symbol':'1.0-0' }}</span>
+            </div>
+
+            <div class="plan-bonus" *ngIf="p.incomeEstimated && !p.isPast">
+              <label>+ Bono estimado</label>
+              <input class="form-control mono" type="number" min="0" step="100" placeholder="0"
+                     [ngModel]="p.bonus || null" (ngModelChange)="setBonus(p.monthKey, $event)" />
+            </div>
+
+            <div class="plan-payments" *ngIf="p.payments.length">
+              <div class="plan-pay" *ngFor="let pay of p.payments">
+                <span class="plan-pay-dot" [style.background]="pay.methodColor"></span>
+                <span class="plan-pay-name">{{ pay.methodName }}</span>
+                <span class="plan-pay-date">límite {{ formatDueShort(pay.dueDate) }}</span>
+                <span class="plan-pay-amount mono">{{ pay.total | currency:'MXN':'symbol':'1.0-0' }}</span>
+              </div>
+              <div class="plan-pay plan-pay-other" *ngIf="p.nonCard > 0">
+                <span class="plan-pay-dot" style="background:var(--color-text-dim);"></span>
+                <span class="plan-pay-name">Otros gastos (no tarjeta)</span>
+                <span class="plan-pay-amount mono">{{ p.nonCard | currency:'MXN':'symbol':'1.0-0' }}</span>
+              </div>
+            </div>
+            <div class="plan-payments" *ngIf="!p.payments.length && p.nonCard > 0">
+              <div class="plan-pay plan-pay-other">
+                <span class="plan-pay-dot" style="background:var(--color-text-dim);"></span>
+                <span class="plan-pay-name">Otros gastos (no tarjeta)</span>
+                <span class="plan-pay-amount mono">{{ p.nonCard | currency:'MXN':'symbol':'1.0-0' }}</span>
+              </div>
+            </div>
+
             <div class="plan-freed" *ngFor="let f of p.freed">
               ✅ Se libera <strong>{{ f.amount | currency:'MXN':'symbol':'1.0-0' }}</strong> — termina “{{ f.desc }}”
             </div>
@@ -193,6 +233,7 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
               <div class="plan-item-main">
                 <div class="plan-item-desc">{{ e.desc }}</div>
                 <div class="plan-item-sub">Mensualidad {{ e.current }}/{{ e.total }} · termina {{ e.endLabel }}</div>
+                <div class="plan-item-interest" *ngIf="e.interest > 0">💳 Interés total {{ e.interest | currency:'MXN':'symbol':'1.0-0' }}</div>
               </div>
               <div class="plan-item-right">
                 <div class="mono">{{ e.amount | currency:'MXN':'symbol':'1.0-0' }}<span class="plan-permonth">/mes</span></div>
@@ -289,7 +330,7 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
                 </select>
               </div>
             </div>
-            <div class="form-row">
+            <div class="form-row" *ngIf="!form.is_deferred">
               <div class="form-group">
                 <label class="form-label">Mes inicio *</label>
                 <select class="form-control" [(ngModel)]="form.start_month">
@@ -305,7 +346,7 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Forma de pago prevista</label>
-                <select class="form-control" [(ngModel)]="form.payment_method_id">
+                <select class="form-control" [(ngModel)]="form.payment_method_id" (ngModelChange)="recomputeFirstPayment()">
                   <option value="">Sin asignar</option>
                   <option *ngFor="let pm of paymentMethods" [value]="pm.id">{{ getPaymentMethodIcon(pm.type) }} {{ pm.name }}</option>
                 </select>
@@ -331,6 +372,47 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
                 </select>
               </div>
             </div>
+
+            <div class="section-divider">Compra a meses / diferido (tarjeta)</div>
+            <div class="deferred-toggle">
+              <span class="form-label" style="margin:0;">¿Es compra a meses o diferido?</span>
+              <div class="flex gap-2">
+                <button type="button" class="btn btn-sm" [class.btn-primary]="!form.is_deferred" [class.btn-secondary]="form.is_deferred" (click)="toggleDeferred(false)">No</button>
+                <button type="button" class="btn btn-sm" [class.btn-primary]="form.is_deferred" [class.btn-secondary]="!form.is_deferred" (click)="toggleDeferred(true)">Sí</button>
+              </div>
+            </div>
+
+            <ng-container *ngIf="form.is_deferred">
+              <div class="alert" style="background:rgba(11,143,106,0.06);border:1px solid rgba(11,143,106,0.18);color:var(--color-text);">
+                Captura los datos tal como aparecen en tu estado de cuenta. El monto mensual y el plazo son los de arriba (“Monto mensual” y “Meses a pagar”).
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Fecha de compra *</label>
+                  <input class="form-control mono" type="date" [(ngModel)]="form.purchase_date" (ngModelChange)="recomputeFirstPayment()" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Total solicitado</label>
+                  <input class="form-control mono" type="number" [(ngModel)]="form.total_amount" placeholder="0.00" step="0.01" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Interés total</label>
+                  <input class="form-control mono" type="number" [(ngModel)]="form.interest_amount" placeholder="0.00" step="0.01" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Primer pago (según corte)</label>
+                  <input class="form-control" [value]="firstPaymentLabel || 'Elige tarjeta y fecha de compra'" readonly style="background:var(--color-surface-2);" />
+                </div>
+              </div>
+              <div class="alert alert-warning" *ngIf="!firstPaymentLabel">
+                Para calcular el primer pago, elige una <strong>Forma de pago prevista</strong> que sea tarjeta con día de corte y límite configurados.
+              </div>
+              <div class="text-muted" style="font-size:12px;" *ngIf="deferredComputedInterest > 0 && (!form.interest_amount || form.interest_amount <= 0)">
+                Interés implícito (mensualidad × plazo − total): {{ deferredComputedInterest | currency:'MXN':'symbol':'1.2-2' }}
+              </div>
+            </ng-container>
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" (click)="closeModal()">Cancelar</button>
@@ -549,6 +631,20 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
       border-color: var(--color-primary);
       background: var(--color-primary-glow);
     }
+    .plan-month.is-past {
+      opacity: 0.72;
+      background: var(--color-surface-2);
+    }
+    .plan-past {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-text-muted);
+      background: var(--color-surface-3);
+      border-radius: 100px;
+      padding: 2px 8px;
+    }
     .plan-month-row {
       display: flex;
       align-items: center;
@@ -585,6 +681,65 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
       border-radius: 8px;
       padding: 6px 10px;
     }
+    .plan-payments {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .plan-pay {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .plan-pay-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .plan-pay-name { font-weight: 700; color: var(--color-accent); }
+    .plan-pay-date {
+      color: var(--color-text-muted);
+      background: var(--color-surface-3);
+      border-radius: 100px;
+      padding: 1px 8px;
+      font-size: 11px;
+    }
+    .plan-pay-amount { margin-left: auto; font-weight: 700; color: var(--color-danger); }
+    .plan-pay-other .plan-pay-name { color: var(--color-text-muted); font-weight: 600; }
+
+    .plan-month-net { font-weight: 800; font-size: 15px; }
+    .plan-flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .plan-flow-in { color: var(--color-primary-dim); }
+    .plan-flow-out { color: var(--color-danger); }
+    .plan-flow-tag {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--color-warning);
+      background: rgba(203,141,43,0.12);
+      border-radius: 100px;
+      padding: 1px 6px;
+      margin-left: 4px;
+    }
+    .plan-bonus {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .plan-bonus label { font-size: 12px; color: var(--color-text-muted); font-weight: 600; white-space: nowrap; }
+    .plan-bonus input { max-width: 130px; padding: 6px 10px; }
     .plan-list {
       display: flex;
       flex-direction: column;
@@ -606,6 +761,15 @@ import { Expense, ExpenseOccurrence, Member, Category, PaymentMethod, PAYMENT_ME
     .plan-item-right .mono { font-weight: 700; color: var(--color-danger); }
     .plan-permonth { font-size: 11px; color: var(--color-text-muted); font-weight: 500; }
     .plan-item-remaining { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
+    .plan-item-interest { font-size: 11px; color: var(--color-warning); margin-top: 2px; }
+
+    .deferred-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
 
     @media (max-width: 560px) {
       .plan-stats { grid-template-columns: 1fr; }
@@ -638,11 +802,21 @@ export class ExpensesComponent implements OnInit {
   categories: Category[] = [];
   paymentMethods: PaymentMethod[] = [];
 
-  // Planeación a futuro
+  // Planeación a futuro (flujo de efectivo)
   baseExpenses: Expense[] = [];
   installmentDebt = 0;
-  projection: { label: string; total: number; freed: { desc: string; amount: number }[]; isCurrent: boolean }[] = [];
-  endingPlans: { desc: string; amount: number; endLabel: string; current: number; total: number; remaining: number; endAbs: number }[] = [];
+  baseIncome = 0;
+  bonuses: Record<string, number> = {};
+  projection: {
+    label: string; monthKey: string; isCurrent: boolean; isPast: boolean;
+    income: number; incomeEstimated: boolean; bonus: number;
+    cardPay: number; nonCard: number; egresos: number; net: number;
+    freed: { desc: string; amount: number }[];
+    payments: { methodName: string; methodColor: string; dueDate: string; total: number; count: number }[];
+  }[] = [];
+  endingPlans: { desc: string; amount: number; endLabel: string; current: number; total: number; remaining: number; endAbs: number; interest: number }[] = [];
+  private _incomeByMonth = new Map<string, number>();
+  private _paymentsMap: Record<string, any[]> = {};
 
   loading = true;
   showModal = false;
@@ -663,8 +837,10 @@ export class ExpensesComponent implements OnInit {
   payForm = { payment_date: this.today(), paid_payment_method_id: '' };
 
   form: Expense = this.emptyForm();
+  firstPaymentLabel = '';
 
   get monthName() { return MONTHS[this.currentMonth - 1]; }
+  get currentProjection() { return this.projection.find(p => p.isCurrent) || this.projection[0]; }
   get totalFiltered() { return this.filteredExpenses.reduce((sum, expense) => sum + this.getExpenseMonthAmount(expense), 0); }
   get totalFixed() { return this.filteredExpenses.filter(expense => expense.is_fixed).reduce((sum, expense) => sum + this.getExpenseMonthAmount(expense), 0); }
   get fixedCount() { return this.filteredExpenses.filter(expense => expense.is_fixed).length; }
@@ -676,10 +852,25 @@ export class ExpensesComponent implements OnInit {
   constructor(private supabase: SupabaseService) {}
 
   ngOnInit() {
+    this.loadBonuses();
     this.loadCategories();
     this.loadMembers();
     this.loadPaymentMethods();
     this.loadExpenses();
+  }
+
+  private bonusStorageKey() {
+    return 'finanzas_planning_bonos_' + (localStorage.getItem('finanzas_casa_household_id') || '');
+  }
+  private loadBonuses() {
+    try { this.bonuses = JSON.parse(localStorage.getItem(this.bonusStorageKey()) || '{}') || {}; }
+    catch { this.bonuses = {}; }
+  }
+  setBonus(monthKey: string, value: any) {
+    const n = Math.max(0, Number(value) || 0);
+    this.bonuses[monthKey] = n;
+    localStorage.setItem(this.bonusStorageKey(), JSON.stringify(this.bonuses));
+    this.computeProjection(); // recálculo local, sin red
   }
 
   async loadCategories() { this.categories = await this.supabase.getCategories() || []; }
@@ -695,15 +886,15 @@ export class ExpensesComponent implements OnInit {
       console.error(error);
     }
     this.filterExpenses();
-    this.buildPlanning();
+    await this.buildPlanning();
     this.loading = false;
   }
 
   /** Índice absoluto de mes para aritmética (año*12 + mes-1). */
   private absMonth(year: number, month: number) { return year * 12 + (month - 1); }
 
-  /** Calcula deuda en mensualidades, proyección de 6 meses y planes que terminan. */
-  buildPlanning() {
+  /** Calcula deuda en mensualidades, proyección de 6 meses, planes que terminan y fechas de pago. */
+  async buildPlanning() {
     const base = this.baseExpenses || [];
     const nowAbs = this.absMonth(this.currentYear, this.currentMonth);
 
@@ -712,7 +903,7 @@ export class ExpensesComponent implements OnInit {
     const ending: typeof this.endingPlans = [];
     for (const exp of base) {
       const total = Number(exp.months_duration ?? 0);
-      if (exp.recurrence_type === 'semanal' || total <= 0) continue;
+      if (exp.recurrence_type === 'semanal' || total < 2) continue; // solo planes a plazos (>= 2 meses)
       const startAbs = this.absMonth(exp.start_year, exp.start_month);
       const endAbs = startAbs + total - 1;
       if (endAbs < nowAbs) continue; // ya terminó
@@ -724,30 +915,108 @@ export class ExpensesComponent implements OnInit {
         amount: Number(exp.amount || 0),
         endLabel: MONTHS[endAbs % 12] + ' ' + Math.floor(endAbs / 12),
         current, total, remaining, endAbs,
+        interest: Number(exp.interest_amount || 0),
       });
     }
     this.installmentDebt = debt;
     ending.sort((a, b) => a.endAbs - b.endAbs);
     this.endingPlans = ending;
 
-    // Proyección de los próximos 6 meses (desde el mes actual)
+    // Ventana: desde el mes ANTERIOR al actual, 7 meses (previo + actual + 5)
+    const startAbs = nowAbs - 1;
+    const startY = Math.floor(startAbs / 12);
+    const startM = (startAbs % 12) + 1;
+
+    // Pagos de tarjeta por mes de vencimiento
+    this._paymentsMap = {};
+    try {
+      this._paymentsMap = await this.supabase.getUpcomingCardPayments(startY, startM, 7) || {};
+    } catch (error) {
+      console.error('No se pudieron cargar las fechas de pago', error);
+    }
+
+    // Ingresos reales = movimientos de tipo "ingreso" (misma fuente que Dashboard/Reportes)
+    this._incomeByMonth = new Map();
+    try {
+      const years = new Set<number>();
+      for (let d = -3; d <= 5; d++) years.add(Math.floor((nowAbs + d) / 12));
+      const lists = await Promise.all([...years].map(y => this.supabase.getIncomingMovementsForYear(y)));
+      for (const list of lists) {
+        for (const mv of (list || [])) {
+          const dt = new Date((mv.date || '') + 'T00:00:00');
+          if (isNaN(dt.getTime())) continue;
+          const key = `${dt.getFullYear()}-${dt.getMonth() + 1}`;
+          this._incomeByMonth.set(key, (this._incomeByMonth.get(key) || 0) + Number(mv.amount || 0));
+        }
+      }
+    } catch (error) {
+      console.error('No se pudieron cargar los ingresos', error);
+    }
+
+    // Ingreso base estimado = promedio de los 3 meses completos anteriores con ingreso
+    let sum = 0, cnt = 0;
+    for (let i = 1; i <= 3; i++) {
+      const abs = nowAbs - i;
+      const v = this._incomeByMonth.get(`${Math.floor(abs / 12)}-${(abs % 12) + 1}`);
+      if (v && v > 0) { sum += v; cnt += 1; }
+    }
+    this.baseIncome = cnt ? Math.round(sum / cnt) : (this._incomeByMonth.get(`${this.currentYear}-${this.currentMonth}`) || 0);
+
+    this.computeProjection();
+  }
+
+  /**
+   * Proyección de 6 meses en base de FLUJO DE EFECTIVO (cuándo sale/entra el dinero):
+   * egresos = pagos de tarjeta que vencen ese mes + gastos que no son tarjeta;
+   * ingresos = lo capturado ese mes, o el estimado base + bono. Neto = ingresos − egresos.
+   * Es sincrónico: usa datos ya cargados, para recalcular al editar un bono sin ir a la red.
+   */
+  computeProjection() {
+    const base = this.baseExpenses || [];
+    const nowAbs = this.absMonth(this.currentYear, this.currentMonth);
     const rows: typeof this.projection = [];
-    for (let i = 0; i < 6; i++) {
+
+    // Desde el mes anterior (i = -1) hasta 5 meses adelante
+    for (let i = -1; i <= 5; i++) {
       const abs = nowAbs + i;
       const y = Math.floor(abs / 12);
       const m = (abs % 12) + 1;
-      let total = 0;
+      const monthKey = `${y}-${m}`;
+
+      // Egresos que NO son tarjeta (salen en su propio mes)
+      let nonCard = 0;
       const freed: { desc: string; amount: number }[] = [];
       for (const exp of base) {
-        total += this.supabase.getExpenseAmountForMonth(exp, m, y);
+        if (exp.payment_method_type !== 'tarjeta_credito') {
+          nonCard += this.supabase.getExpenseAmountForMonth(exp, m, y);
+        }
         const dur = Number(exp.months_duration ?? 0);
-        if (dur > 0 && exp.recurrence_type !== 'semanal') {
+        if (dur >= 2 && exp.recurrence_type !== 'semanal') {
           const endAbs = this.absMonth(exp.start_year, exp.start_month) + dur - 1;
           if (endAbs === abs) freed.push({ desc: exp.description, amount: Number(exp.amount || 0) });
         }
       }
-      rows.push({ label: MONTHS[m - 1] + ' ' + y, total, freed, isCurrent: i === 0 });
+
+      // Egresos de tarjeta = pagos que VENCEN ese mes
+      const payments = this._paymentsMap[monthKey] || [];
+      const cardPay = payments.reduce((s: number, p: any) => s + Number(p.total || 0), 0);
+      const egresos = Math.round(nonCard + cardPay);
+
+      // Ingresos: lo capturado ese mes, o el estimado base + bono
+      const captured = this._incomeByMonth.get(monthKey) || 0;
+      const bonus = Number(this.bonuses[monthKey] || 0);
+      const income = captured > 0 ? captured : Math.round(this.baseIncome + bonus);
+      const incomeEstimated = !(captured > 0);
+
+      rows.push({
+        label: MONTHS[m - 1] + ' ' + y, monthKey, isCurrent: i === 0, isPast: i < 0,
+        income, incomeEstimated, bonus,
+        cardPay: Math.round(cardPay), nonCard: Math.round(nonCard), egresos,
+        net: income - egresos,
+        freed, payments,
+      });
     }
+
     this.projection = rows;
   }
 
@@ -808,6 +1077,7 @@ export class ExpensesComponent implements OnInit {
           is_active: true,
         }
       : this.emptyForm();
+    this.recomputeFirstPayment();
     this.showModal = true;
   }
 
@@ -815,6 +1085,8 @@ export class ExpensesComponent implements OnInit {
 
   async save() {
     if (!this.form.description || !this.form.amount) return;
+    // En diferidos, asegura que el mes de inicio = primer mes de pago según el corte.
+    if (this.form.is_deferred) this.recomputeFirstPayment();
     this.saving = true;
     try {
       const payload: any = {
@@ -834,6 +1106,10 @@ export class ExpensesComponent implements OnInit {
         payment_date: this.form.payment_date || null,
         paid_payment_method_id: this.form.paid_payment_method_id || null,
         notes: this.form.notes || null,
+        is_deferred: this.form.is_deferred ?? false,
+        purchase_date: this.form.is_deferred ? (this.form.purchase_date || null) : null,
+        total_amount: this.form.is_deferred ? (Number(this.form.total_amount) || null) : null,
+        interest_amount: this.form.is_deferred ? (Number(this.form.interest_amount) || null) : null,
       };
       if (this.editing) await this.supabase.updateExpense(this.editId, payload);
       else await this.supabase.createExpense(payload);
@@ -916,6 +1192,47 @@ export class ExpensesComponent implements OnInit {
     return PAYMENT_METHOD_TYPES.find(item => item.value === type)?.icon || '💳';
   }
 
+  /** Fecha corta "12 jun" a partir de un ISO YYYY-MM-DD. */
+  formatDueShort(iso: string): string {
+    if (!iso) return '';
+    const [, m, d] = iso.split('-').map(Number);
+    const short = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return `${d} ${short[(m || 1) - 1] || ''}`;
+  }
+
+  /** Activa/desactiva el modo "compra a meses / diferido". */
+  toggleDeferred(on: boolean) {
+    this.form.is_deferred = on;
+    if (on) {
+      this.form.recurrence_type = 'mensual';
+      this.form.is_fixed = false;
+      if (!this.form.purchase_date) this.form.purchase_date = this.today();
+      if (!this.form.months_duration || this.form.months_duration < 2) this.form.months_duration = 6;
+    }
+    this.recomputeFirstPayment();
+  }
+
+  /** Recalcula el primer mes de pago según la fecha de compra y el corte/límite de la tarjeta. */
+  recomputeFirstPayment() {
+    this.firstPaymentLabel = '';
+    if (!this.form.is_deferred || !this.form.purchase_date) return;
+    const pm = this.paymentMethods.find(method => method.id === this.form.payment_method_id);
+    const first = this.supabase.computeFirstPaymentMonth(this.form.purchase_date, pm);
+    if (!first) return;
+    this.form.start_month = first.month;
+    this.form.start_year = first.year;
+    this.firstPaymentLabel = `${MONTHS[first.month - 1]} ${first.year}`;
+  }
+
+  /** Interés implícito si el total y la mensualidad no cuadran (informativo). */
+  get deferredComputedInterest(): number {
+    const monthly = Number(this.form.amount || 0);
+    const months = Number(this.form.months_duration || 0);
+    const total = Number(this.form.total_amount || 0);
+    if (monthly <= 0 || months < 2 || total <= 0) return 0;
+    return Math.max(0, monthly * months - total);
+  }
+
   /**
    * Mensualidad a la que corresponde este gasto en el mes visible y cuántas faltan.
    * Solo aplica a gastos mensuales con duración definida (months_duration > 0).
@@ -925,7 +1242,8 @@ export class ExpensesComponent implements OnInit {
     const total = Number(exp.months_duration ?? 0);
     const sm = Number(exp.start_month ?? 0);
     const sy = Number(exp.start_year ?? 0);
-    if (total <= 0 || sm <= 0 || sy <= 0) return null; // 0 = indefinido → sin mensualidades
+    // Solo planes a plazos (>= 2 meses). 0 = indefinido, 1 = pago único → sin mensualidades.
+    if (total < 2 || sm <= 0 || sy <= 0) return null;
 
     // Mes/año de esta ocurrencia (o el mes visible si no hay fecha)
     let month = this.currentMonth;
@@ -959,6 +1277,10 @@ export class ExpensesComponent implements OnInit {
       payment_method_id: '',
       payment_date: '',
       paid_payment_method_id: '',
+      is_deferred: false,
+      purchase_date: '',
+      total_amount: 0,
+      interest_amount: 0,
     };
   }
 

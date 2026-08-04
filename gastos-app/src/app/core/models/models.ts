@@ -219,6 +219,11 @@ export interface Expense {
   months_duration: number; // 0 = indefinido
   start_month: number;
   start_year: number;
+  // Compra a meses / diferido con tarjeta
+  purchase_date?: string;    // fecha de la transacción
+  total_amount?: number;     // total solicitado / monto original
+  interest_amount?: number;  // interés total del diferido
+  is_deferred?: boolean;     // ocurrencias ancladas al mes de pago
   is_fixed: boolean;
   is_active: boolean;
   payment_method_id?: string;
@@ -265,6 +270,10 @@ export interface ExpenseOccurrence {
   months_duration?: number;
   start_month?: number;
   start_year?: number;
+  purchase_date?: string;
+  total_amount?: number;
+  interest_amount?: number;
+  is_deferred?: boolean;
   category_id?: string;
   category_name?: string;
   category_icon?: string;
